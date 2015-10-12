@@ -1,4 +1,4 @@
-#=== CONTEXT ==================================================================
+# == CONTEXT ==================================================================
 # 2D NodeBox API in OpenGL.
 # Authors: Tom De Smedt, Frederik De Bleser
 # License: BSD (see LICENSE.txt for details).
@@ -21,24 +21,21 @@ except ImportError:
 
 from datetime import datetime
 from glob import glob
-from hashlib import md5
-from io import StringIO
-from math import cos, sin, radians, pi, floor
+from math import cos, sin, pi, floor
 from os import path, remove
-from random import seed, choice, shuffle, random as rnd
+from random import shuffle, random as rnd
 from sys import getrefcount
 from time import time
 from types import FunctionType, MethodType
 
-from pyglet.gl import *
-from pyglet.image import Texture
+from pyglet.gl import *  # noqa
 
 from . import geometry
-from .bezierpath import *
-from .caching import *
-from .color import *
-from .image import *
-from .shader import *
+from .bezierpath import *  # noqa
+from .caching import *  # noqa
+from .color import *  # noqa
+from .image import *  # noqa
+from .shader import *  # noqa
 
 
 try:
@@ -63,30 +60,30 @@ CORNER = "corner"
 CENTER = "center"
 
 # Stroke styles
-SOLID  = "solid"
+SOLID = "solid"
 DOTTED = "dotted"
 DASHED = "dashed"
 
 # Font weight
 NORMAL = "normal"
-BOLD   = "bold"
+BOLD = "bold"
 ITALIC = "italic"
 
 # Text alignment
-LEFT   = "left"
-RIGHT  = "right"
+LEFT = "left"
+RIGHT = "right"
 CENTER = "center"
 
 
 # -- Drawing state ------------------------------------------------------------
 
 # globals to keep drawing state
-_background  = None    # Current state background color.
-_fill        = None    # Current state fill color.
-_stroke      = None    # Current state stroke color.
+_background = None    # Current state background color.
+_fill = None    # Current state fill color.
+_stroke = None    # Current state stroke color.
 _strokewidth = 1       # Current state strokewidth.
 _strokestyle = "solid" # Current state strokestyle.
-_alpha       = 1       # Current state alpha transparency.
+_alpha = 1       # Current state alpha transparency.
 
 
 color = Color
@@ -187,8 +184,8 @@ def colormode(mode=None, range=1.0):
 # the color directly.
 
 def color_mixin(**kwargs):
-    fill        = kwargs.get("fill", _fill)
-    stroke      = kwargs.get("stroke", _stroke)
+    fill = kwargs.get("fill", _fill)
+    stroke = kwargs.get("stroke", _stroke)
     strokewidth = kwargs.get("strokewidth", _strokewidth)
     strokestyle = kwargs.get("strokestyle", _strokestyle)
     return (fill, stroke, strokewidth, strokestyle)
@@ -710,8 +707,8 @@ class Animation(list):
         """
         list.__init__(self, list(images))
         self.duration = duration # Duration of the entire animation.
-        self.loop     = loop     # Loop from last frame to first frame?
-        self._i       = -1       # Frame counter.
+        self.loop = loop     # Loop from last frame to first frame?
+        self._i = -1       # Frame counter.
         self._t = Transition(0, interpolation=kwargs.get("interpolation", LINEAR))
 
     def copy(self, **kwargs):
@@ -817,12 +814,12 @@ except:
     DEFAULT_FONT = "Arial"
 
 
-_fonts      = []             # Custom fonts loaded from file.
-_fontname   = DEFAULT_FONT   # Current state font name.
-_fontsize   = 12             # Current state font size.
+_fonts = []             # Custom fonts loaded from file.
+_fontname = DEFAULT_FONT   # Current state font name.
+_fontsize = 12             # Current state font size.
 _fontweight = [False, False] # Current state font weight (bold, italic).
 _lineheight = 1.0            # Current state text lineheight.
-_align      = LEFT           # Current state text alignment (LEFT/RIGHT/CENTER).
+_align = LEFT           # Current state text alignment (LEFT/RIGHT/CENTER).
 
 
 def font(fontname=None, fontsize=None, fontweight=None, file=None):
@@ -946,17 +943,17 @@ def label(str="", width=None, height=None, **kwargs):
     label = pyglet.text.Label(batch=_label_batch)
     label.begin_update()
     label.document = pyglet.text.document.FormattedDocument(str or " ")
-    label.width     = width
-    label.height    = height
+    label.width = width
+    label.height = height
     label.font_name = fontname
     label.font_size = fontsize
-    label.bold      = bold
-    label.italic    = italic
+    label.bold = bold
+    label.italic = italic
     label.multiline = True
-    label.anchor_y  = "bottom"
+    label.anchor_y = "bottom"
     label.set_style("align", align)
     label.set_style("line_spacing", lineheight * fontsize)
-    label.color     = [int(ch*255) for ch in fill]
+    label.color = [int(ch*255) for ch in fill]
     if str == "":
         # Empty string "" does not set properties so we used " " first.
         label.text = str
@@ -985,12 +982,12 @@ class Text(object):
             a, kwargs["align"] = kwargs.get("align", _align), LEFT
         else:
             a = None
-        self.__dict__["x"]      = x
-        self.__dict__["y"]      = y
+        self.__dict__["x"] = x
+        self.__dict__["y"] = y
         self.__dict__["_label"] = label(str, width, height, **kwargs)
         self.__dict__["_dirty"] = False
         self.__dict__["_align"] = a
-        self.__dict__["_fill"]  = None
+        self.__dict__["_fill"] = None
 
     @property
     def xy(self):
@@ -1007,7 +1004,7 @@ class Text(object):
 
     @size.setter
     def size(self, wh):
-        self.width  = wh[0]
+        self.width = wh[0]
         self.height = wh[1]
 
     def __getattr__(self, k):
@@ -1384,12 +1381,12 @@ class Prototype(object):
         elif isinstance(value, (list, tuple)):
             return [self._deepcopy(x) for x in value]
         elif isinstance(value, dict):
-            return dict([(k, self._deepcopy(v)) for k,v in value.items()])
+            return dict([(k, self._deepcopy(v)) for k, v in value.items()])
         elif isinstance(value, (str, float, bool) + integer_types):
             return value
         else:
             # Biggest problem here is how to find/relink circular references.
-            raise TypeError("Prototype can't bind %s." % str(value.__class__))
+            raise TypeError("Prototype can't bind %s." % value.__class__)
 
     def _bind(self, key, value):
         """Adds a new method or property to the prototype.
@@ -1429,6 +1426,7 @@ class Prototype(object):
         """
         if not name:
             name = function.__name__
+
         self._bind(name, function)
 
     def set_property(self, key, value):
@@ -1456,10 +1454,10 @@ class EventHandler(object):
         # Use __dict__ directly so we can do multiple inheritance in
         # combination with Prototype:
         self.__dict__["enabled"] = True  # Receive events from the canvas?
-        self.__dict__["focus"]   = False # True when this object receives the focus.
+        self.__dict__["focus"] = False # True when this object receives the focus.
         self.__dict__["pressed"] = False # True when the mouse is pressed on this object.
         self.__dict__["dragged"] = False # True when the mouse is dragged on this object.
-        self.__dict__["_queue"]  = []
+        self.__dict__["_queue"] = []
 
     def on_mouse_enter(self, mouse):
         pass
@@ -1523,8 +1521,8 @@ class Transition(object):
 
     def __init__(self, value, interpolation=SMOOTH):
         self._v0 = value # Previous value => Transition.start.
-        self._vi = value # Current value  => Transition.current.
-        self._v1 = value # Desired value  => Transition.stop.
+        self._vi = value # Current value => Transition.current.
+        self._v1 = value # Desired value => Transition.stop.
         self._t0 = TIME  # Start time.
         self._t1 = TIME  # End time.
         self._interpolation = interpolation
@@ -1654,28 +1652,28 @@ class Layer(list, Prototype, EventHandler):
 
         Prototype.__init__(self) # Facilitates extension on the fly.
         EventHandler.__init__(self)
-        self._id       = _uid()
-        self.name      = name                  # Layer name. Layers are accessible as ParentLayer.[name]
-        self.canvas    = None                  # The canvas this layer is drawn to.
-        self.parent    = parent                # The layer this layer is a child of.
-        self._x        = Transition(x)         # Layer horizontal position in pixels, from the left.
-        self._y        = Transition(y)         # Layer vertical position in pixels, from the bottom.
-        self._width    = Transition(width)     # Layer width in pixels.
-        self._height   = Transition(height)    # Layer height in pixels.
-        self._dx       = Transition(origin[0]) # Transformation origin point.
-        self._dy       = Transition(origin[1]) # Transformation origin point.
-        self._origin   = origin_mode           # Origin point as RELATIVE or ABSOLUTE coordinates?
-        self._scale    = Transition(scale)     # Layer width and height scale.
+        self._id = _uid()
+        self.name = name                  # Layer name. Layers are accessible as ParentLayer.[name]
+        self.canvas = None                  # The canvas this layer is drawn to.
+        self.parent = parent                # The layer this layer is a child of.
+        self._x = Transition(x)         # Layer horizontal position in pixels, from the left.
+        self._y = Transition(y)         # Layer vertical position in pixels, from the bottom.
+        self._width = Transition(width)     # Layer width in pixels.
+        self._height = Transition(height)    # Layer height in pixels.
+        self._dx = Transition(origin[0]) # Transformation origin point.
+        self._dy = Transition(origin[1]) # Transformation origin point.
+        self._origin = origin_mode           # Origin point as RELATIVE or ABSOLUTE coordinates?
+        self._scale = Transition(scale)     # Layer width and height scale.
         self._rotation = Transition(rotation)  # Layer rotation.
-        self._opacity  = Transition(opacity)   # Layer opacity.
-        self.duration  = duration              # The time it takes to animate transformations.
-        self.top       = True                  # Draw on top of or beneath parent?
-        self.flipped   = False                 # Flip the layer horizontally?
-        self.clipped   = False                 # Clip child layers to bounds?
-        self.hidden    = False                 # Hide the layer?
+        self._opacity = Transition(opacity)   # Layer opacity.
+        self.duration = duration              # The time it takes to animate transformations.
+        self.top = True                  # Draw on top of or beneath parent?
+        self.flipped = False                 # Flip the layer horizontally?
+        self.clipped = False                 # Clip child layers to bounds?
+        self.hidden = False                 # Hide the layer?
         self._transform_cache = None           # Cache of the local transformation matrix.
         self._transform_stack = None           # Cache of the cumulative transformation matrix.
-        self._clipping_mask   = LayerClippingMask(self)
+        self._clipping_mask = LayerClippingMask(self)
 
     @classmethod
     def from_image(self, img, *args, **kwargs):
@@ -1712,32 +1710,37 @@ class Layer(list, Prototype, EventHandler):
         return layer
 
     def copy(self, parent=None, canvas=None):
-        """ Returns a copy of the layer.
-            All Layer properties will be copied, except for the new parent and canvas,
-            which you need to define as optional parameters.
-            This means that copies are not automatically appended to the parent layer or canvas.
+        """Return a copy of the layer.
+
+        All Layer properties will be copied, except for the new parent and
+        canvas, which you need to define as optional parameters. This means
+        that copies are not automatically appended to the parent layer or
+        canvas.
+
         """
-        layer           = self.__class__() # Create instance of the derived class, not Layer.
-        layer.duration  = 0                # Copy all transitions instantly.
-        layer.canvas    = canvas
-        layer.parent    = parent
-        layer.name      = self.name
-        layer._x        = self._x.copy()
-        layer._y        = self._y.copy()
-        layer._width    = self._width.copy()
-        layer._height   = self._height.copy()
-        layer._origin   = self._origin
-        layer._dx       = self._dx.copy()
-        layer._dy       = self._dy.copy()
-        layer._scale    = self._scale.copy()
+        # Create instance of the derived class, not Layer.
+        layer = self.__class__()
+        # Copy all transitions instantly.
+        layer.duration = 0
+        layer.canvas = canvas
+        layer.parent = parent
+        layer.name = self.name
+        layer._x = self._x.copy()
+        layer._y = self._y.copy()
+        layer._width = self._width.copy()
+        layer._height = self._height.copy()
+        layer._origin = self._origin
+        layer._dx = self._dx.copy()
+        layer._dy = self._dy.copy()
+        layer._scale = self._scale.copy()
         layer._rotation = self._rotation.copy()
-        layer._opacity  = self._opacity.copy()
-        layer.duration  = self.duration
-        layer.top       = self.top
-        layer.flipped   = self.flipped
-        layer.clipped   = self.clipped
-        layer.hidden    = self.hidden
-        layer.enabled   = self.enabled
+        layer._opacity = self._opacity.copy()
+        layer.duration = self.duration
+        layer.top = self.top
+        layer.flipped = self.flipped
+        layer.clipped = self.clipped
+        layer.hidden = self.hidden
+        layer.enabled = self.enabled
         # Use base Layer.extend(), we don't care about what subclass.extend() does.
         Layer.extend(layer, [child.copy() for child in self])
         # Inherit all the dynamic properties and methods.
@@ -1765,18 +1768,21 @@ class Layer(list, Prototype, EventHandler):
             list.append(value, self)
         self.__dict__[key] = value
 
-    def _get_canvas(self):
+    @property
+    def canvas(self):
         return self.__dict__.get("canvas")
-    def _get_parent(self):
+
+    @canvas.setter
+    def canvas(self, canv):
+        self._set_container("canvas", canv)
+
+    @property
+    def parent(self):
         return self.__dict__.get("parent")
 
-    def _set_canvas(self, canvas):
-        self._set_container("canvas", canvas)
-    def _set_parent(self, layer):
+    @parent.setter
+    def parent(self, layer):
         self._set_container("parent", layer)
-
-    canvas = property(_get_canvas, _set_canvas)
-    parent = property(_get_parent, _set_parent)
 
     @property
     def root(self):
@@ -1789,15 +1795,19 @@ class Layer(list, Prototype, EventHandler):
     def insert(self, index, layer):
         list.insert(self, index, layer)
         layer.__dict__["parent"] = self
+
     def append(self, layer):
         list.append(self, layer)
         layer.__dict__["parent"] = self
+
     def extend(self, layers):
         for layer in layers:
             Layer.append(self, layer)
+
     def remove(self, layer):
         list.remove(self, layer)
         layer.__dict__["parent"] = None
+
     def pop(self, index):
         layer = list.pop(self, index)
         layer.__dict__["parent"] = None
@@ -1839,13 +1849,13 @@ class Layer(list, Prototype, EventHandler):
     def _set_opacity(self, opacity):
         self._opacity.set(opacity, self.duration)
 
-    x        = property(_get_x, _set_x)
-    y        = property(_get_y, _set_y)
-    width    = property(_get_width, _set_width)
-    height   = property(_get_height, _set_height)
-    scaling  = property(_get_scale, _set_scale)
+    x = property(_get_x, _set_x)
+    y = property(_get_y, _set_y)
+    width = property(_get_width, _set_width)
+    height = property(_get_height, _set_height)
+    scaling = property(_get_scale, _set_scale)
     rotation = property(_get_rotation, _set_rotation)
-    opacity  = property(_get_opacity, _set_opacity)
+    opacity = property(_get_opacity, _set_opacity)
 
     @property
     def xy(self):
@@ -1857,34 +1867,50 @@ class Layer(list, Prototype, EventHandler):
         self.y = v[1]
 
     def _get_origin(self, relative=False):
-        """ Returns the point (x,y) from which all layer transformations originate.
-            When relative=True, x and y are defined percentually (0.0-1.0) in terms of width and height.
-            In some cases x=0 or y=0 is returned:
-            - For an infinite layer (width=None or height=None), we can't deduct the absolute origin
-              from coordinates stored relatively (e.g. what is infinity*0.5?).
-            - Vice versa, for an infinite layer we can't deduct the relative origin from coordinates
-              stored absolute (e.g. what is 200/infinity?).
+        """Returns the point from which all layer transformations originate.
+
+        When relative=True, x and y are defined percentually (0.0-1.0) in terms
+        of width and height.
+
+        In some cases x=0 or y=0 is returned:
+
+        - For an infinite layer (width=None or height=None), we can't deduct
+          the absolute origin from coordinates stored relatively (e.g. what is
+          infinity * 0.5?).
+
+        - Vice versa, for an infinite layer we can't deduct the relative origin
+          from coordinates stored absolute (e.g. what is 200/infinity?).
+
         """
         dx = self._dx.current
         dy = self._dy.current
-        w  = self._width.current
-        h  = self._height.current
+        w = self._width.current
+        h = self._height.current
+
         # Origin is stored as absolute coordinates and we want it relative.
         if self._origin == ABSOLUTE and relative:
-            if w is None: w = 0
-            if h is None: h = 0
-            dx = w!=0 and dx/w or 0
-            dy = h!=0 and dy/h or 0
+            if w is None:
+                w = 0
+
+            if h is None:
+                h = 0
+
+            dx = dx / w if w != 0 else 0
+            dy = dy / h if h != 0 else 0
         # Origin is stored as relative coordinates and we want it absolute.
         elif self._origin == RELATIVE and not relative:
-            dx = w is not None and dx*w or 0
-            dy = h is not None and dy*h or 0
+            dx = w is not None and dx * w or 0
+            dy = h is not None and dy * h or 0
+
         return dx, dy
 
     def _set_origin(self, x, y, relative=False):
-        """ Sets the transformation origin point in either absolute or relative coordinates.
-            For example, if a layer is 400x200 pixels, setting the origin point to (200,100)
-            all transformations (translate, rotate, scale) originate from the center.
+        """Set the transformation origin point in either absolute or relative coordinates.
+
+        For example, if a layer is 400x200 pixels, setting the origin point to
+        (200,100) all transformations (translate, rotate, scale) originate from
+        the center.
+
         """
         self._transform_cache = None
         self._dx.set(x, self.duration)
@@ -1892,35 +1918,40 @@ class Layer(list, Prototype, EventHandler):
         self._origin = relative and RELATIVE or ABSOLUTE
 
     def origin(self, x=None, y=None, relative=False):
-        """ Sets or returns the point (x,y) from which all layer transformations originate.
+        """Set and return the point from which all layer transformations originate.
         """
         if x is not None:
             if x == CENTER:
                 x, y, relative = 0.5, 0.5, True
+
             if y is not None:
                 self._set_origin(x, y, relative)
+
         return self._get_origin(relative)
 
-    def _get_relative_origin(self):
+    @property
+    def relative_origin(self):
         return self.origin(relative=True)
-    def _set_relative_origin(self, xy):
+
+    @relative_origin.setter
+    def relative_origin(self, xy):
         self._set_origin(xy[0], xy[1], relative=True)
 
-    relative_origin = property(_get_relative_origin, _set_relative_origin)
-
-    def _get_absolute_origin(self):
+    @property
+    def absolute_origin(self):
         return self.origin(relative=False)
-    def _set_absolute_origin(self, xy):
+
+    @absolute_origin.setter
+    def absolute_origin(self, xy):
         self._set_origin(xy[0], xy[1], relative=False)
 
-    absolute_origin = property(_get_absolute_origin, _set_absolute_origin)
-
-    def _get_visible(self):
+    @property
+    def visible(self):
         return not self.hidden
-    def _set_visible(self, b):
-        self.hidden = not b
 
-    visible = property(_get_visible, _set_visible)
+    @visible.setter
+    def visible(self, b):
+        self.hidden = not b
 
     def translate(self, x, y):
         self.x += x
@@ -1936,9 +1967,9 @@ class Layer(list, Prototype, EventHandler):
         self.flipped = not self.flipped
 
     def _update(self):
-        """ Called each frame from canvas._update() to update the layer transitions.
+        """Called each frame by canvas._update() to update layer transitions.
         """
-        done  = self._x.update()
+        done = self._x.update()
         done &= self._y.update()
         done &= self._width.update()
         done &= self._height.update()
@@ -1946,10 +1977,13 @@ class Layer(list, Prototype, EventHandler):
         done &= self._dy.update()
         done &= self._scale.update()
         done &= self._rotation.update()
-        if not done: # i.e. the layer is being transformed
+
+        if not done:  # i.e. the layer is being transformed
             self._transform_cache = None
+
         self._opacity.update()
         self.update()
+
         for layer in self:
             layer._update()
 
@@ -1960,26 +1994,27 @@ class Layer(list, Prototype, EventHandler):
 
     @property
     def done(self):
-        """ Returns True when all transitions have finished.
+        """Return True when all transitions have finished.
         """
-        return self._x.done \
-           and self._y.done \
-           and self._width.done \
-           and self._height.done \
-           and self._dx.done \
-           and self._dy.done \
-           and self._scale.done \
-           and self._rotation.done \
-           and self._opacity.done
+        return all(
+            self._x.done,
+            self._y.done,
+            self._width.done,
+            self._height.done,
+            self._dx.done,
+            self._dy.done,
+            self._scale.done,
+            self._rotation.done,
+            self._opacity.done)
 
     def _draw(self):
-        """ Draws the transformed layer and all of its children.
-        """
+        """Draw the transformed layer and all of its children."""
         if self.hidden:
             return
 
         glPushMatrix()
-        # Be careful that the transformations happen in the same order in Layer._transform().
+        # Be careful that the transformations happen in the same order in
+        # Layer._transform().
         # translate => flip => rotate => scale => origin.
         # Center the contents around the origin point.
         dx, dy = self.origin(relative=False)
@@ -2002,9 +2037,10 @@ class Layer(list, Prototype, EventHandler):
 
         # Draw layer.
         global _alpha
-        _alpha = self._opacity.current # XXX should also affect child layers?
+        _alpha = self._opacity.current  # XXX should also affect child layers?
         glPushMatrix()
-        glTranslatef(-round(dx), -round(dy), 0) # Layers are drawn relative from parent origin.
+        # Layers are drawn relative from parent origin.
+        glTranslatef(-round(dx), -round(dy), 0)
         self.draw()
         glPopMatrix()
         _alpha = 1
@@ -2028,18 +2064,22 @@ class Layer(list, Prototype, EventHandler):
         pass
 
     def render(self):
-        """Returns the layer as a flattened image.
+        """Return the layer as a flattened image.
 
         The layer and all of its children need to have width and height set.
 
         """
         b = self.bounds
+
         if geometry.INFINITE in (b.x, b.y, b.width, b.height):
             raise LayerRenderError("can't render layer of infinite size")
-        return render(lambda: (translate(-b.x,-b.y), self._draw()), b.width, b.height)
 
-    def layer_at(self, x, y, clipped=False, enabled=False, transformed=True, _covered=False):
-        """Return the topmost layer containing the mouse position, None otherwise.
+        return render(lambda: (translate(-b.x, -b.y), self._draw()),
+                      b.width, b.height)
+
+    def layer_at(self, x, y, clipped=False, enabled=False, transformed=True,
+                 _covered=False):
+        """Return the topmost layer containing the mouse position or None.
 
         With clipped=True, no parts of child layers outside the parent's bounds
         are checked.
@@ -2098,20 +2138,25 @@ class Layer(list, Prototype, EventHandler):
         """
         if self._transform_cache is None:
             # Calculate the local transformation matrix.
-            # Be careful that the transformations happen in the same order in Layer._draw().
+            # Be careful that the transformations happen in the same order in
+            # Layer._draw().
             # translate => flip => rotate => scale => origin.
             tf = Transform()
             dx, dy = self.origin(relative=False)
             tf.translate(round(self._x.current), round(self._y.current))
+
             if self.flipped:
                 tf.scale(-1, 1)
+
             tf.rotate(self._rotation.current)
             tf.scale(self._scale.current, self._scale.current)
             tf.translate(-round(dx), -round(dy))
             self._transform_cache = tf
             # Flush the cumulative transformation cache of all children.
+
             def _flush(layer):
                 layer._transform_stack = None
+
             self.traverse(_flush)
         if not local:
             # Return the cumulative transformation matrix.
@@ -2122,7 +2167,8 @@ class Layer(list, Prototype, EventHandler):
                     self._transform_stack = self._transform_cache.copy()
                 else:
                     # Accumulate all the parent layer transformations.
-                    # In the process, we update the transformation state of any outdated parent.
+                    # In the process, we update the transformation state of
+                    # any outdated parent.
                     dx, dy = self.parent.origin(relative=False)
                     # Layers are drawn relative from parent origin.
                     tf = self.parent._transform(local=False).copy()
@@ -2143,10 +2189,12 @@ class Layer(list, Prototype, EventHandler):
         infinite.
 
         """
-        w = self._width.current; w = w is None and geometry.INFINITE or w
-        h = self._height.current; h = h is None and geometry.INFINITE or h
+        w = self._width.current
+        w = geometry.INFINITE if w is None else w
+        h = self._height.current
+        h = geometry.INFINITE if h is None else h
         # Find the transformed bounds of the layer:
-        p = self.transform.map([(0,0), (w,0), (w,h), (0,h)])
+        p = self.transform.map([(0, 0), (w, 0), (w, h), (0, h)])
         x = min(p[0][0], p[1][0], p[2][0], p[3][0])
         y = min(p[0][1], p[1][1], p[2][1], p[3][1])
         w = max(p[0][0], p[1][0], p[2][0], p[3][0]) - x
@@ -2169,15 +2217,17 @@ class Layer(list, Prototype, EventHandler):
         parent layer) is not rotated or scaled, and has its origin at (0,0).
 
         """
-        w = self._width.current; w = w is None and geometry.INFINITE or w
-        h = self._height.current; h = h is None and geometry.INFINITE or h
+        w = self._width.current
+        w = geometry.INFINITE if w is None else w
+        h = self._height.current
+        h = geometry.INFINITE if h is None else h
 
         if not transformed:
             x0, y0 = self.absolute_position()
             return x0 <= x <= x0 + w and y0 <= y <= y0 + h
 
         # Find the transformed bounds of the layer:
-        p = self.transform.map([(0,0), (w,0), (w,h), (0,h)])
+        p = self.transform.map([(0, 0), (w, 0), (w, h), (0, h)])
         return geometry.point_in_polygon(p, x, y)
 
     hit_test = contains
@@ -2197,24 +2247,21 @@ class Layer(list, Prototype, EventHandler):
         return x, y
 
     def traverse(self, visit=lambda layer: None):
-        """Recurse the layer structure and calls visit() on each child layer.
-        """
+        """Recurse layer structure and calls visit() on each child layer."""
         visit(self)
-        [layer.traverse(visit) for layer in self]
+        for layer in self:
+            layer.traverse(visit)
 
     def __repr__(self):
-        return "Layer(%sx=%.2f, y=%.2f, scale=%.2f, rotation=%.2f, opacity=%.2f, duration=%.2f)" % (
-            self.name is not None and "name='%s', " % self.name or "",
-            self.x,
-            self.y,
-            self.scaling,
-            self.rotation,
-            self.opacity,
-            self.duration
-        )
+        return ("Layer(%sx=%.2f, y=%.2f, scale=%.2f, rotation=%.2f, "
+                "opacity=%.2f, duration=%.2f)" %
+                ("name='%s', " % self.name if self.name else "", self.x,
+                 self.y, self.scaling, self.rotation, self.opacity,
+                 self.duration))
 
     def __eq__(self, other):
         return isinstance(other, Layer) and self._id == other._id
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -2222,7 +2269,7 @@ class Layer(list, Prototype, EventHandler):
 layer = Layer
 
 
-#--- GROUP -------------------------------------------------------------------------------------------
+# -- GROUP --------------------------------------------------------------------
 
 class Group(Layer):
     """A layer that serves as a container for other layers.
@@ -2246,14 +2293,18 @@ class Group(Layer):
     @property
     def width(self):
         return 0
+
     @property
     def height(self):
         return 0
 
-    def layer_at(self, x, y, clipped=False, enabled=False, transformed=True, _covered=False):
+    def layer_at(self, x, y, clipped=False, enabled=False, transformed=True,
+                 _covered=False):
         # Ignores clipped=True for Group (since it has no width or height).
         for child in reversed(self):
-            layer = child.layer_at(x, y, clipped, enabled, transformed, _covered)
+            layer = child.layer_at(x, y, clipped, enabled, transformed,
+                                   _covered)
+
             if layer:
                 return layer
 
@@ -2266,16 +2317,16 @@ group = Group
 
 # Mouse cursors:
 DEFAULT = "default"
-HIDDEN  = "hidden"
-CROSS   = pyglet.window.Window.CURSOR_CROSSHAIR
-HAND    = pyglet.window.Window.CURSOR_HAND
-TEXT    = pyglet.window.Window.CURSOR_TEXT
-WAIT    = pyglet.window.Window.CURSOR_WAIT
+HIDDEN = "hidden"
+CROSS = pyglet.window.Window.CURSOR_CROSSHAIR
+HAND = pyglet.window.Window.CURSOR_HAND
+TEXT = pyglet.window.Window.CURSOR_TEXT
+WAIT = pyglet.window.Window.CURSOR_WAIT
 
 # Mouse buttons:
-LEFT    = "left"
-RIGHT   = "right"
-MIDDLE  = "middle"
+LEFT = "left"
+RIGHT = "right"
+MIDDLE = "middle"
 
 
 class Mouse(Point):
@@ -2284,56 +2335,72 @@ class Mouse(Point):
 
     def __init__(self, canvas, x=0, y=0):
         Point.__init__(self, x, y)
-        self._canvas   = canvas
-        self._cursor   = DEFAULT    # Mouse cursor: CROSS, HAND, HIDDEN, TEXT, WAIT.
-        self._button   = None       # Mouse button pressed: LEFT, RIGHT, MIDDLE.
-        self.modifiers = []         # Mouse button modifiers: CTRL, SHIFT, OPTION.
-        self.pressed   = False      # True if the mouse button is pressed.
-        self.dragged   = False      # True if the mouse is dragged.
-        self.scroll    = Point(0,0) # Scroll offset.
-        self.dx        = 0          # Relative offset from previous horizontal position.
-        self.dy        = 0          # Relative offset from previous vertical position.
+        self._canvas = canvas
+        # Mouse cursor: CROSS, HAND, HIDDEN, TEXT, WAIT.
+        self._cursor = DEFAULT
+        # Mouse button pressed: LEFT, RIGHT, MIDDLE.
+        self._button = None
+        # Mouse button modifiers: CTRL, SHIFT, OPTION.
+        self.modifiers = []
+        # True if the mouse button is pressed.
+        self.pressed = False
+        # True if the mouse is dragged.
+        self.dragged = False
+        # Scroll offset.
+        self.scroll = Point(0, 0)
+        # Relative offset from previous horizontal position.
+        self.dx = 0
+        # Relative offset from previous vertical position.
+        self.dy = 0
 
     # Backwards compatibility due to an old typo:
     @property
     def vx(self):
         return self.dx
+
     @property
     def vy(self):
         return self.dy
 
     @property
     def relative_x(self):
-        try: return float(self.x) / self._canvas.width
-        except ZeroDivisionError:
-            return 0
-    @property
-    def relative_y(self):
-        try: return float(self.y) / self._canvas.height
+        try:
+            return float(self.x) / self._canvas.width
         except ZeroDivisionError:
             return 0
 
-    def _get_cursor(self):
+    @property
+    def relative_y(self):
+        try:
+            return float(self.y) / self._canvas.height
+        except ZeroDivisionError:
+            return 0
+
+    @property
+    def cursor(self):
         return self._cursor
-    def _set_cursor(self, mode):
+
+    @cursor.setter
+    def cursor(self, mode):
         self._cursor = mode != DEFAULT and mode or None
+
         if mode == HIDDEN:
-            self._canvas._window.set_mouse_visible(False); return
+            self._canvas._window.set_mouse_visible(False)
+            return
         self._canvas._window.set_mouse_cursor(
             self._canvas._window.get_system_mouse_cursor(
                 self._cursor))
 
-    cursor = property(_get_cursor, _set_cursor)
-
-    def _get_button(self):
+    @property
+    def button(self):
         return self._button
-    def _set_button(self, button):
-        self._button = \
-            button == pyglet.window.mouse.LEFT   and LEFT or \
-            button == pyglet.window.mouse.RIGHT  and RIGHT or \
-            button == pyglet.window.mouse.MIDDLE and MIDDLE or None
 
-    button = property(_get_button, _set_button)
+    @button.setter
+    def button(self, btn):
+        self._button = (
+            btn == pyglet.window.mouse.LEFT and LEFT or
+            btn == pyglet.window.mouse.RIGHT and RIGHT or
+            btn == pyglet.window.mouse.MIDDLE and MIDDLE or None)
 
     def __repr__(self):
         return "Mouse(x=%.1f, y=%.1f, pressed=%s, dragged=%s)" % (
@@ -2344,35 +2411,39 @@ class Mouse(Point):
 
 # Key codes:
 BACKSPACE = "backspace"
-DELETE    = "delete"
-TAB       = "tab"
-ENTER     = "enter"
-SPACE     = "space"
-ESCAPE    = "escape"
-UP        = "up"
-DOWN      = "down"
-LEFT      = "left"
-RIGHT     = "right"
+DELETE = "delete"
+TAB = "tab"
+ENTER = "enter"
+SPACE = "space"
+ESCAPE = "escape"
+UP = "up"
+DOWN = "down"
+LEFT = "left"
+RIGHT = "right"
 
 # Key modifiers:
-OPTION  = \
-ALT     = "option"
-CTRL    = "ctrl"
-SHIFT   = "shift"
+OPTION = ALT = "option"
+CTRL = "ctrl"
+SHIFT = "shift"
 COMMAND = "command"
 
 MODIFIERS = (OPTION, CTRL, SHIFT, COMMAND)
 
+
+# XXX: Use pyglet's KeyStateHandler instead
 class Keys(list):
     """Keeps track of the keys pressed and any modifiers (e.g. shift or control key).
     """
 
     def __init__(self, canvas):
-        self._canvas   = canvas
-        self.code      = None   # Last key pressed
-        self.char      = ""     # Last key character representation (i.e., SHIFT + "a" = "A").
-        self.modifiers = []     # Modifier keys pressed (OPTION, CTRL, SHIFT, COMMAND).
-        self.pressed   = False
+        self._canvas = canvas
+        # Last key pressed
+        self.code = None
+        # Last key character representation (i.e., SHIFT + "a" = "A").
+        self.char = ""
+        # Modifier keys pressed (OPTION, CTRL, SHIFT, COMMAND).
+        self.modifiers = []
+        self.pressed = False
 
     def append(self, code):
         code = self._decode(code)
@@ -2397,17 +2468,18 @@ class Keys(list):
         if not isinstance(code, integer_types):
             s = code
         else:
-            s = pyglet.window.key.symbol_string(code)         # 65288 => "BACKSPACE"
-            s = s.lower()                                     # "BACKSPACE" => "backspace"
-            s = s.lstrip("_")                                 # "_1" => "1"
-            s = s.replace("return", ENTER)                    # "return" => "enter"
-            s = s.replace("num_", "")                         # "num_space" => "space"
-            s = s.endswith(MODIFIERS) and s.lstrip("lr") or s # "lshift" => "shift"
+            s = pyglet.window.key.symbol_string(code)  # 65288 => "BACKSPACE"
+            s = s.lower()  # "BACKSPACE" => "backspace"
+            s = s.lstrip("_")  # "_1" => "1"
+            s = s.replace("return", ENTER)  # "return" => "enter"
+            s = s.lstrip("num_")  # "num_space" => "space"
+            # "lshift" => "shift"
+            s = s.lstrip("lr") if s.endswith(MODIFIERS) else s
         return s
 
     def __repr__(self):
-        return "Keys(char=%s, code=%s, modifiers=%s, pressed=%s)" % (
-            repr(self.char), repr(iter(self)), repr(self.modifiers), repr(self.pressed))
+        return "Keys(char=%r, code=%r, modifiers=%r, pressed=%s)" % (
+            self.char, list(self), self.modifiers, self.pressed)
 
 
 # =============================================================================
@@ -2419,7 +2491,7 @@ VERY_LIGHT_GREY = 0.95
 FRAME = 0
 
 # Window styles.
-WINDOW_DEFAULT    = pyglet.window.Window.WINDOW_STYLE_DEFAULT
+WINDOW_DEFAULT = pyglet.window.Window.WINDOW_STYLE_DEFAULT
 WINDOW_BORDERLESS = pyglet.window.Window.WINDOW_STYLE_BORDERLESS
 
 # Configuration settings for the canvas.
@@ -2427,16 +2499,16 @@ WINDOW_BORDERLESS = pyglet.window.Window.WINDOW_STYLE_BORDERLESS
 # The stencil buffer is enabled (we need it to do clipping masks).
 # Multisampling will be enabled (if possible) to do anti-aliasing.
 settings = OPTIMAL = dict(
-#      buffer_size = 32, # Let Pyglet decide automatically.
-#         red_size = 8,
-#       green_size = 8,
-#        blue_size = 8,
-        depth_size = 24,
-      stencil_size = 1,
-        alpha_size = 8,
-     double_buffer = 1,
-    sample_buffers = 1,
-           samples = 4
+    # buffer_size = 32, # Let Pyglet decide automatically.
+    # red_size = 8,
+    # green_size = 8,
+    # blue_size = 8,
+    depth_size=24,
+    stencil_size=1,
+    alpha_size=8,
+    double_buffer=1,
+    sample_buffers=1,
+    samples=4
 )
 
 
@@ -2477,27 +2549,27 @@ class Canvas(list, Prototype, EventHandler):
     def __init__(self, width=640, height=480, name="NodeBox for OpenGL",
                  resizable=False, border=True, settings=OPTIMAL, vsync=True):
         window = dict(
-            caption = name,
-            visible = False,
-            width = width,
-            height = height,
-            resizable = resizable,
-            style = WINDOW_BORDERLESS if border is False else WINDOW_DEFAULT,
-            config = _configure(settings),
-            vsync = vsync
+            caption=name,
+            visible=False,
+            width=width,
+            height=height,
+            resizable=resizable,
+            style=WINDOW_DEFAULT if border else WINDOW_BORDERLESS,
+            config=_configure(settings),
+            vsync=vsync
         )
         Prototype.__init__(self)
         EventHandler.__init__(self)
-        self.profiler                 = Profiler(self)
-        self._window                  = pyglet.window.Window(**window)
-        self._fps                     = 60          # Frames per second.
-        self._frame                   = 0           # The current frame.
-        self._elapsed                 = 0           # dt = time elapsed since last frame.
-        self._active                  = False       # Application is running?
-        self.paused                   = False       # Pause animation?
-        self._mouse                   = Mouse(self) # The mouse cursor location.
-        self._keys                    = Keys(self)  # The keys pressed on the keyboard.
-        self._focus                   = None        # The layer being focused by the mouse.
+        self.profiler = Profiler(self)
+        self._window = pyglet.window.Window(**window)
+        self._fps = 60             # Frames per second.
+        self._frame = 0            # The current frame.
+        self._elapsed = 0          # dt = time elapsed since last frame.
+        self._active = False       # Application is running?
+        self.paused = False        # Pause animation?
+        self._mouse = Mouse(self)  # The mouse cursor location.
+        self._keys = Keys(self)    # The keys pressed on the keyboard.
+        self._focus = None         # The layer being focused by the mouse.
 
         # Mouse and keyboard events:
         self._window.on_mouse_enter = self._on_mouse_enter
@@ -2549,7 +2621,7 @@ class Canvas(list, Prototype, EventHandler):
     def vsync(self):
         return self._window.vsync
 
-    @name.setter
+    @vsync.setter
     def vsync(self, bool):
         self._window.set_vsync(bool)
 
@@ -2604,7 +2676,7 @@ class Canvas(list, Prototype, EventHandler):
 
     @size.setter
     def size(self, wh):
-        self.width  = wh[0]
+        self.width = wh[0]
         self.height = wh[1]
 
     @property
@@ -2640,7 +2712,7 @@ class Canvas(list, Prototype, EventHandler):
     def keys(self):
         return self._keys
 
-    @property # Backwards compatibility.
+    @property  # Backwards compatibility.
     def key(self):
         return self._keys
 
@@ -2648,7 +2720,7 @@ class Canvas(list, Prototype, EventHandler):
     def focus(self):
         return self._focus
 
-    #--- Event dispatchers ------------------------------
+    # -- Event dispatchers ----------------------------------------------------
     # First events are dispatched, then update() and draw() are called.
 
     def layer_at(self, x, y, **kwargs):
@@ -2679,14 +2751,14 @@ class Canvas(list, Prototype, EventHandler):
         layer = self.layer_at(x, y, enabled=True)
         if self._focus is not None and self._focus != layer:
             self._focus.on_mouse_leave(self._mouse)
-            self._focus.focus   = False
+            self._focus.focus = False
             self._focus.pressed = False
             self._focus.dragged = False
             self._focus = None
 
     def _on_mouse_motion(self, x, y, dx, dy):
-        self._mouse.x  = x
-        self._mouse.y  = y
+        self._mouse.x = x
+        self._mouse.y = y
         self._mouse.dx = int(dx)
         self._mouse.dy = int(dy)
         self.on_mouse_motion(self._mouse)
@@ -2696,7 +2768,7 @@ class Canvas(list, Prototype, EventHandler):
         # If the layer differs from the layer which currently has the focus,
         # or the mouse is not over any layer, remove the current focus.
         if (self._focus is not None and
-                (self._focus != layer or not self._focus.contains(x,y))):
+                (self._focus != layer or not self._focus.contains(x, y))):
             self._focus.on_mouse_leave(self._mouse)
             self._focus.focus = False
             self._focus = None
@@ -2714,7 +2786,7 @@ class Canvas(list, Prototype, EventHandler):
     def _on_mouse_press(self, x, y, button, modifiers):
         self._mouse.pressed = True
         self._mouse.button = button
-        self._mouse.modifiers = [a for (a,b) in (
+        self._mouse.modifiers = [a for (a, b) in (
             (CTRL, pyglet.window.key.MOD_CTRL),
             (SHIFT, pyglet.window.key.MOD_SHIFT),
             (OPTION, pyglet.window.key.MOD_OPTION)) if modifiers & b]
@@ -2732,10 +2804,10 @@ class Canvas(list, Prototype, EventHandler):
             self._focus.dragged = False
 
         self.on_mouse_release(self._mouse)
-        self._mouse.button    = None
+        self._mouse.button = None
         self._mouse.modifiers = []
-        self._mouse.pressed   = False
-        self._mouse.dragged   = False
+        self._mouse.pressed = False
+        self._mouse.dragged = False
 
         if self._focus is not None:
             # Get the topmost layer over which the mouse is hovering.
@@ -2743,7 +2815,7 @@ class Canvas(list, Prototype, EventHandler):
 
             # If the mouse is no longer over the layer with the focus
             # (this can happen after dragging), remove the focus.
-            if self._focus != layer or not self._focus.contains(x,y):
+            if self._focus != layer or not self._focus.contains(x, y):
                 self._focus.on_mouse_leave(self._mouse)
                 self._focus.focus = False
                 self._focus = None
@@ -2761,7 +2833,7 @@ class Canvas(list, Prototype, EventHandler):
         self._mouse.y = y
         self._mouse.dx = int(dx)
         self._mouse.dy = int(dy)
-        self._mouse.modifiers = [a for (a,b) in (
+        self._mouse.modifiers = [a for (a, b) in (
             (CTRL, pyglet.window.key.MOD_CTRL),
             (SHIFT, pyglet.window.key.MOD_SHIFT),
             (OPTION, pyglet.window.key.MOD_OPTION)) if modifiers & b]
@@ -2844,7 +2916,7 @@ class Canvas(list, Prototype, EventHandler):
     def on_resize(self):
         pass
 
-    #--- Main loop --------------------------------------
+    # -- Main loop ------------------------------------------------------------
 
     def setup(self):
         pass
@@ -2995,7 +3067,7 @@ class Canvas(list, Prototype, EventHandler):
             self.set_method(stop, name="stop")
 
         self._setup()
-        self.fps = self._fps # Schedule the _update and _draw events.
+        self.fps = self._fps  # Schedule the _update and _draw events.
         pyglet.app.run()
 
     @property
@@ -3026,7 +3098,7 @@ class Canvas(list, Prototype, EventHandler):
 
         self._fps = v
 
-    #--- Frame export -----------------------------------
+    # -- Frame export ---------------------------------------------------------
 
     def render(self):
         """Returns a screenshot of the current frame as a texture.
@@ -3046,7 +3118,7 @@ class Canvas(list, Prototype, EventHandler):
         """Export the current frame as a PNG-file."""
         pyglet.image.get_buffer_manager().get_color_buffer().save(path)
 
-    #--- Prototype --------------------------------------
+    # -- Prototype ------------------------------------------------------------
 
     def __setattr__(self, k, v):
         # Canvas is a Prototype, so Canvas.draw() can be overridden
@@ -3085,40 +3157,58 @@ class Canvas(list, Prototype, EventHandler):
         return "Canvas(name='%s', size='%s', layers=%s)" % (
             self.name, self.size, repr(list(self)))
 
-#--- PROFILER ----------------------------------------------------------------------------------------
+
+# -- PROFILER -----------------------------------------------------------------
+
 
 CUMULATIVE = "cumulative"
-SLOWEST    = "slowest"
+SLOWEST = "slowest"
 
 _profile_canvas = None
 _profile_frames = 100
+
+
 def profile_run():
     for i in range(_profile_frames):
         _profile_canvas._update()
         _profile_canvas._draw()
 
-class Profiler:
 
+class Profiler:
+    """Executes a number of frames of animation under a the Python profiler.
+
+    Returns a string with performance statistics
+
+    """
     def __init__(self, canvas):
-        self.canvas  = canvas
+        self.canvas = canvas
 
     @property
     def framerate(self):
         return pyglet.clock.get_fps()
 
-    def run(self, draw=None, setup=None, update=None, frames=100, sort=CUMULATIVE, top=30):
-        """ Runs cProfile on the canvas for the given number of frames.
-            The performance statistics are returned as a string, sorted by SLOWEST or CUMULATIVE.
-            For example, instead of doing canvas.run(draw):
+    def run(self, draw=None, setup=None, update=None, frames=100,
+            sort=CUMULATIVE, top=30):
+        """Runs cProfile on the canvas for the given number of frames.
+
+        The performance statistics are returned as a string, sorted by SLOWEST
+        or CUMULATIVE.
+
+        For example, instead of doing canvas.run(draw):
+
             print canvas.profiler.run(draw, frames=100)
+
         """
-        # Register the setup, draw, update functions with the canvas (if given).
+        # Register setup, draw, update functions with the canvas (if given).
         if isinstance(setup, FunctionType):
             self.canvas.set_method(setup, name="setup")
+
         if isinstance(draw, FunctionType):
             self.canvas.set_method(draw, name="draw")
+
         if isinstance(update, FunctionType):
             self.canvas.set_method(update, name="update")
+
         # If enabled, turn Psyco off.
         psyco_stopped = False
         try:
@@ -3127,7 +3217,8 @@ class Profiler:
         except:
             pass
         # Set the current canvas and the number of frames to profile.
-        # The profiler will then repeatedly execute canvas._update() and canvas._draw().
+        # The profiler will then repeatedly execute canvas._update() and
+        # canvas._draw().
         # Statistics are redirected from stdout to a temporary file.
         global _profile_canvas, _profile_frames
         _profile_canvas = self.canvas
@@ -3137,7 +3228,7 @@ class Profiler:
         cProfile.run("profile_run()", "_profile")
         p = pstats.Stats("_profile")
         p.stream = open("_profile", "w")
-        p.sort_stats(sort==SLOWEST and "time" or sort).print_stats(top)
+        p.sort_stats("time" if sort == SLOWEST else sort).print_stats(top)
         p.stream.close()
         s = open("_profile").read()
         remove("_profile")
@@ -3146,11 +3237,15 @@ class Profiler:
             psyco.profile()
         return s
 
-#--- LIBRARIES ---------------------------------------------------------------------------------------
-# Import the library and assign it a _ctx variable containing the current context.
-# This mimics the behavior in NodeBox for Mac OS X.
 
+# -- LIBRARIES ----------------------------------------------------------------
 def ximport(library):
+    """Import the library and assign it a _ctx variable containing the
+    current context.
+
+    This mimics the behavior in NodeBox for Mac OS X.
+
+    """
     from sys import modules
     library = __import__(library)
     library._ctx = modules[__name__]

@@ -1,5 +1,5 @@
 ###########################################################################
-# 
+#
 #  Psyco profiler (Python part).
 #   Copyright (C) 2001-2002  Armin Rigo et.al.
 
@@ -106,7 +106,7 @@ def trytobind(co, globals, log=1):
 if PYTHON_SUPPORT:
     # the list of code objects that have been tagged
     tagged_codes = []
-    
+
     def tag(co, globals):
         if logger:
             try:
@@ -157,7 +157,7 @@ class Profiler:
         self.alarms = []
         profilers.append(self)
         go()
-    
+
     def start(self):
         curmem = _psyco.memory()
         memlimits = []
@@ -186,16 +186,16 @@ class Profiler:
                 return self.limitreached('time')
             timelimits.append(self.time)
             self.time_at_start = curtime
-        
+
         try:
             self.do_start()
-        except error, e:
+        except error as e:
             if logger:
                 logger.write('%s: disabled by psyco.error:' % (
                     self.__class__.__name__), 4)
                 logger.write('    %s' % str(e), 3)
             return 0
-        
+
         if memlimits:
             self.memlimits_args = (time.sleep, (self.MemoryTimerResolution,),
                                    self.check_memory, (min(memlimits),))
@@ -204,7 +204,7 @@ class Profiler:
             self.alarms.append(_psyco.alarm(time.sleep, (min(timelimits),),
                                             self.time_out))
         return 1
-    
+
     def stop(self):
         for alarm in self.alarms:
             alarm.stop(0)

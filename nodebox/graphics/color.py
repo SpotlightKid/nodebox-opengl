@@ -2,6 +2,13 @@
 # -*- coding: utf-8 -*-
 """Classes and functions for working with and transforming colors."""
 
+from __future__ import absolute_import
+
+from pyglet.gl import *
+
+from . import geometry
+
+
 __all__ = (
     'HSB',
     'LAB',
@@ -197,7 +204,7 @@ class Color(list):
                 r, g, b = rgb_to_lab(r, g, b)
 
         if base != 1:
-            r, g, b, a = [ch*base for ch in (r, g, b, a)]
+            r, g, b, a = [ch * base for ch in (r, g, b, a)]
 
         if base != 1 and isinstance(base, int):
             r, g, b, a = [int(ch) for ch in (r, g, b, a)]
@@ -216,7 +223,7 @@ class Color(list):
         """
         ch = zip(self.map(1, colorspace)[:3], clr.map(1, colorspace)[:3])
         r, g, b = [geometry.lerp(a, b, t) for a, b in ch]
-        a = geometry.lerp(self.a, len(clr)==4 and clr[3] or 1, t)
+        a = geometry.lerp(self.a, clr[3] if len(clr) == 4 else 1, t)
         return Color(r, g, b, a, colorspace=colorspace)
 
     def rotate(self, angle):
@@ -239,9 +246,12 @@ def rgb_to_hsb(r, g, b):
         s = d / float(v)
 
     if s != 0:
-        if   r == v: h = 0 + (g-b) / d
-        elif g == v: h = 2 + (b-r) / d
-        else       : h = 4 + (r-g) / d
+        if r == v:
+            h = 0 + (g - b) / d
+        elif g == v:
+            h = 2 + (b - r) / d
+        else:
+            h = 4 + (r - g) / d
 
     h = h / 6.0 % 1
     return h, s, v
@@ -255,14 +265,14 @@ def hsb_to_rgb(h, s, v):
     h = h % 1 * 6.0
     i = floor(h)
     f = h - i
-    x = v * (1-s)
-    y = v * (1-s * f)
-    z = v * (1-s * (1-f))
+    x = v * (1 - s)
+    y = v * (1 - s * f)
+    z = v * (1 - s * (1 - f))
 
     if i > 4:
         return v, x, y
 
-    return [(v,z,x), (y,v,x), (x,v,z), (x,y,v), (z,x,v)][int(i)]
+    return [(v, z, x), (y, v, x), (x, v, z), (x, y, v), (z, x, v)][int(i)]
 
 
 def rgb_to_xyz(r, g, b):
@@ -270,30 +280,31 @@ def rgb_to_xyz(r, g, b):
     r, g, b = [((ch + 0.055) / 1.055) ** 2.4 if ch > 0.04045 else ch / 12.92
                for ch in (r, g, b)]
     r, g, b = [ch * 100.0 for ch in (r, g, b)]
-    r, g, b = ( # Observer = 2, Illuminant = D65
+    r, g, b = (  # Observer = 2, Illuminant = D65
         r * 0.4124 + g * 0.3576 + b * 0.1805,
         r * 0.2126 + g * 0.7152 + b * 0.0722,
         r * 0.0193 + g * 0.1192 + b * 0.9505)
 
-    return r/95.047, g/100.0, b/108.883
+    return r / 95.047, g / 100.0, b / 108.883
 
 
 def xyz_to_rgb(x, y, z):
     """Convert the given CIE XYZ color values to RGB (between 0.0-1.0)."""
-    x, y, z = x*95.047, y*100.0, z*108.883
+    x, y, z = x * 95.047, y * 100.0, z * 108.883
     x, y, z = [ch / 100.0 for ch in (x, y, z)]
-    r = x *  3.2406 + y * -1.5372 + z * -0.4986
-    g = x * -0.9689 + y *  1.8758 + z *  0.0415
-    b = x * -0.0557 + y * -0.2040 + z *  1.0570
-    r, g, b = [1.055 * ch**(1/2.4) - 0.055 if ch > 0.0031308 else ch * 12.92
-              for ch in (r, g, b)]
+    r = x * 3.2406 + y * -1.5372 + z * -0.4986
+    g = x * -0.9689 + y * 1.8758 + z * 0.0415
+    b = x * -0.0557 + y * -0.2040 + z * 1.0570
+    r, g, b = [1.055 * ch ** (1 / 2.4) - 0.055
+               if ch > 0.0031308 else ch * 12.92
+               for ch in (r, g, b)]
     return r, g, b
 
 
 def rgb_to_lab(r, g, b):
     """Convert the given RGB values to CIE LAB (between 0.0-1.0)."""
     x, y, z = rgb_to_xyz(r, g, b)
-    x, y, z = [ch ** (1/3.0) if ch > 0.008856 else (ch * 7.787 + 16 / 116.0)
+    x, y, z = [ch ** (1 / 3.0) if ch > 0.008856 else (ch * 7.787 + 16 / 116.0)
                for ch in (x, y, z)]
     l, a, b = y * 116 - 16, 500 * (x - y), 200 * (y - z)
     l, a, b = l / 100.0, (a + 86) / (86 + 98), (b + 108) / (108 + 94)
@@ -306,7 +317,7 @@ def lab_to_rgb(l, a, b):
     y = (l + 16) / 116.0
     x = y + a / 500.0
     z = y - b / 200.0
-    x, y, z = [ch**3 if ch**3 > 0.008856 else (ch - 16 / 116.0) / 7.787
+    x, y, z = [ch ** 3 if ch ** 3 > 0.008856 else (ch - 16 / 116.0) / 7.787
                for ch in (x, y, z)]
     return xyz_to_rgb(x, y, z)
 
@@ -348,6 +359,7 @@ _colorwheel = [
     (300, 267), (315, 282), (330, 298), (345, 329), (360, 360)
 ]
 
+
 def rotate_ryb(h, s, b, angle=180):
     """Rotate the given HSB color (0.0-1.0) on the RYB color wheel.
 
@@ -355,7 +367,7 @@ def rotate_ryb(h, s, b, angle=180):
     aesthetically pleasing complementary colors.
 
     """
-    h = h*360 % 360
+    h = h * 360 % 360
     # Find the location (angle) of the hue on the RYB color wheel.
     for i in range(len(_colorwheel) - 1):
         (x0, y0), (x1, y1) = _colorwheel[i], _colorwheel[i + 1]
@@ -424,19 +436,19 @@ def colorplane(x, y, width, height, *a):
         clr1, clr2, clr3, clr4 = a[0], a[1], a[2], a[2]
     elif len(a) == 0:
         # Black top, white bottom.
-        clr1 = clr2 = (0,0,0,1)
-        clr3 = clr4 = (1,1,1,1)
+        clr1 = clr2 = (0, 0, 0, 1)
+        clr3 = clr4 = (1, 1, 1, 1)
 
     glPushMatrix()
     glTranslatef(x, y, 0)
     glScalef(width, height, 1)
     glBegin(GL_QUADS)
     glColor4f(clr1[0], clr1[1], clr1[2], clr1[3] * _alpha)
-    glVertex2f(-0.0,  1.0)
+    glVertex2f(-0.0, 1.0)
     glColor4f(clr2[0], clr2[1], clr2[2], clr2[3] * _alpha)
-    glVertex2f( 1.0,  1.0)
+    glVertex2f(1.0, 1.0)
     glColor4f(clr3[0], clr3[1], clr3[2], clr3[3] * _alpha)
-    glVertex2f( 1.0, -0.0)
+    glVertex2f(1.0, -0.0)
     glColor4f(clr4[0], clr4[1], clr4[2], clr4[3] * _alpha)
     glVertex2f(-0.0, -0.0)
     glEnd()

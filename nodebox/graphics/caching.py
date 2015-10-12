@@ -7,7 +7,7 @@ modified.
 
 """
 
-from pyglet.gl import *
+from pyglet.gl import *  # noqa
 
 __all__ = (
     'flush',

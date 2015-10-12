@@ -5,20 +5,24 @@
 # Copyright (c) 2008-2012 City In A Bottle (cityinabottle.org)
 # http://cityinabottle.org/nodebox
 
-import osc
+from __future__ import absolute_import, print_function
+
 import sys
 import os
 import subprocess
-import StringIO
 import signal
 import time
 import socket as _socket
+
+from . import osc
+
 
 def _find(match=lambda item: False, list=[]):
     """ Returns the first item in the list for which match(item)=True, or None.
     """
     for item in list:
-        if match(item): return item
+        if match(item):
+            return item
 
 #=====================================================================================================
 
@@ -30,19 +34,20 @@ WINDOWS = sys.platform.startswith('win')
 if not WINDOWS:
     import select
     import fcntl
+
     def read_non_blocking(stream, bytes=1024, timeout=0):
-        # Reads a number of bytes from the given stream, 
+        # Reads a number of bytes from the given stream,
         # without deadlocking when no more data is available (returns None instead).
         fcntl.fcntl(stream, fcntl.F_SETFL, fcntl.fcntl(stream, fcntl.F_GETFL) | os.O_NONBLOCK)
         if not select.select([stream], [], [], 0)[0]:
             return None
         return stream.read(bytes)
-    
+
 if WINDOWS:
     import ctypes; from ctypes.wintypes import DWORD
     import msvcrt
     def read_non_blocking(stream, bytes=1024):
-        # Reads a number of bytes from the given stream, 
+        # Reads a number of bytes from the given stream,
         # without deadlocking when no more data is available (returns None instead).
         p = msvcrt.get_osfhandle(stream.fileno())
         s = ctypes.create_string_buffer(1)
@@ -55,7 +60,7 @@ if WINDOWS:
             return s.value.decode()
 
 class Process(object):
-    
+
     def __init__(self, program, options={}, start=True):
         """ Runs the given program (i.e. executable file path) as a background process
             with the given command-line options.
@@ -65,35 +70,36 @@ class Process(object):
         self._process = None
         if start:
             self.start()
-        
+
     @property
     def started(self):
         return self._process is not None
-    
+
     @property
     def id(self):
         return self._process \
            and self._process.pid or None
-        
+
     pid = id
-    
+
     @property
     def output(self, bytes=1024):
         # Yields a number of bytes of output, or None if the process is idle.
         if self._process is not None:
             return read_non_blocking(self._process.stdout, bytes)
-    
+
     def start(self):
         """ Starts the program with the given command-line options.
             The output can be read from Process.output.
         """
-        o = [self.program]; [o.extend((k,v)) for k,v in self.options.items()]
+        o = [self.program]
+        [o.extend((k,v)) for k,v in self.options.items()]
         o = [str(x) for x in o if x is not None]
         self._process = subprocess.Popen(o,
             stdout = subprocess.PIPE,
             stderr = subprocess.STDOUT
         )
-    
+
     def stop(self):
         """ Attempts to stop the process.
             Returns True when the process is stopped, False otherwise.
@@ -128,7 +134,7 @@ class Process(object):
 #--- SOCKET ------------------------------------------------------------------------------------------
 
 class Socket(_socket.socket):
-    
+
     def __init__(self, host, port):
         """ Creates a socket connection to the given host (IP address) and port.
             Socket.close() will close the connection when Socket.connections is 0
@@ -137,7 +143,7 @@ class Socket(_socket.socket):
         self.bind((host, port))
         self.setblocking(0)
         self.connections = 0
-    
+
     def close(self):
         if self.connections <= 0:
             _socket.socket.close(self)
@@ -172,8 +178,8 @@ OUT = 44001
 class PDError(Exception):
     pass
 
-class PD(object):   
-    
+class PD(object):
+
     def __init__(self, patch=None, buffer=128, options={}, start=False, path=DEFAULT):
         """ Creates a network connection with PureData.
             When a patch (.pd file) is given and start=True, loads PD with the patch in the background.
@@ -213,40 +219,40 @@ class PD(object):
         if start:
             self.start()
         osc.init()
-            
-    @property    
+
+    @property
     def patch(self):
         return self._options.get("-open")
     @property
     def buffer(self):
         return self._options.get("-audiobuf")
-    
+
     def start(self):
         """ Starts PD as a background process and loads PD.patch.
             If PD is already running another patch, restarts the application.
         """
         if self.patch is None \
         or not os.path.exists(self.patch):
-            raise PDError, "no PD patch file at '%s'" % self.patch
+            raise PDError("no PD patch file at '%s'" % self.patch)
         if not self._path:
-            raise PDError, "no PD application found"
+            raise PDError("no PD application found")
         if not os.path.exists(self._path):
-            raise PDError, "no PD application at '%s'" % self._path
+            raise PDError("no PD application at '%s'" % self._path)
         if not self._process:
             self._process = Process(program=self._path, options=self._options)
-    
+
     def stop(self):
         for callback in self._callback.values():
             callback.stop()
-        return self._process \
-           and self._process.stop()
-            
+
+        return self._process and self._process.stop()
+
     def send(self, data, path, host=LOCALHOST, port=OUT):
         """ Sends the given list of data over OSC to PD.
             The path specifies the address where PD receives the data e.g. "/creature/perch".
         """
         osc.sendMsg(path, data, host, port)
-        
+
     def get(self, path, host=LOCALHOST, port=IN):
         """ Returns the data sent from the given path in PD.
         """
@@ -254,18 +260,18 @@ class PD(object):
         if not id in self._callback:
             self._callback[id] = PDCallback(path, host, port)
         return self._callback[id].data
-        
+
     def __del__(self):
         try: self.stop()
         except:
             pass
-            
+
     @property
     def output(self):
         return self._process.output
 
 class PDCallback:
-    
+
     def __init__(self, path, host=LOCALHOST, port=44001):
         """ Creates a listener for data broadcast from Pd.
             PDCallback.__call__() is called from PD.get().
@@ -275,16 +281,16 @@ class PDCallback:
         self._data   = []
         self._socket = socket(host, port)
         self._socket.connections += 1
-        
+
     def __call__(self, *data):
         # First two arguments in the list are the path and typetags string.
         self._data = data[0][2:] if data != "nodata" else []
-    
+
     @property
     def data(self):
         osc.getOSC(self._socket)
         return self._data
-        
+
     def stop(self):
         self._socket.connections -= 1
         self._socket.close()

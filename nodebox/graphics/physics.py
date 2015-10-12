@@ -64,72 +64,84 @@ class Vector(object):
     def __setitem__(self, i, v):
         setattr(self, ("x", "y", "z")[i], float(v))
 
-    def _get_xyz(self):
+    @property
+    def xyz(self):
         return (self.x, self.y, self.z)
-    def _set_xyz(self, (x,y,z)):
-        self.x = float(x)
-        self.y = float(y)
-        self.z = float(z)
-    xyz = property(_get_xyz, _set_xyz)
 
-    def _get_xy(self):
+    @xyz.setter
+    def xyz(self, v):
+        self.x = float(v[0])
+        self.y = float(v[1])
+        self.z = float(v[2])
+
+    @property
+    def xy(self):
         return (self.x, self.y)
-    def _set_xy(self, (x,y)):
-        self.x = float(x)
-        self.y = float(y)
-    xy = property(_get_xy, _set_xy)
 
-    def _get_length(self):
+    @xy.setter
+    def xy(self, v):
+        self.x = float(v[0])
+        self.y = float(v[1])
+
+    @property
+    def length(self):
         return sqrt(self.x**2 + self.y**2 + self.z**2)
-    def _set_length(self, n):
+
+    @length.setter
+    def length(self, n):
         d = self.length or 1
-        self.x *= n/d
-        self.y *= n/d
-        self.z *= n/d
-    length = magnitude = property(_get_length, _set_length)
+        self.x *= n / d
+        self.y *= n / d
+        self.z *= n / d
 
     def distance(self, v):
-        """ Returns the distance between two vectors,
-            e.g. if two vectors would be two sides of a triangle, returns the third side.
+        """Return the distance between two vectors,
+
+        e.g. if two vectors would be two sides of a triangle, returns the third
+        side.
+
         """
         dx = v.x - self.x
         dy = v.y - self.y
         dz = v.z - self.z
-        return sqrt(dx**2 + dy**2 + dz**2)
+        return sqrt(dx ** 2 + dy ** 2 + dz ** 2)
 
     def distance2(self, v):
         # Squared distance, avoiding the costly root calculation.
-        return (v.x-self.x)**2 + (v.y-self.y)**2 + (v.z-self.z)**2
+        return (v.x - self.x) ** 2 + (v.y - self.y) ** 2 + (v.z - self.z) ** 2
 
     def normalize(self):
-        """ Normalizes the vector to a unit vector with length=1.
-        """
+        """Normalize the vector to a unit vector with length=1."""
         d = self.length or 1
         self.x /= d
         self.y /= d
         self.z /= d
 
     def _normalized(self):
-        """ Yields a new vector that is the normalized vector of this vector.
-        """
+        """Yield a new vector that is the normalized vector of this vector."""
         d = self.length
+
         if d == 0:
             return self.copy()
+
         return Vector(self.x/d, self.y/d, self.z/d)
+
     normalized = unit = property(_normalized)
 
     def reverse(self):
-        """ Reverses the direction of the vector so it points in the opposite direction.
+        """Reverse the direction of the vector so it points in the opposite direction.
         """
         self.x = -self.x
         self.y = -self.y
         self.z = -self.z
+
     flip = reverse
 
     def _reversed(self):
-        """ Yields a new vector pointing in the opposite direction of this vector.
+        """Yield a new vector pointing in the opposite direction of this vector.
         """
         return Vector(-self.x, -self.y, -self.z)
+
     reversed = flipped = inverse = property(_reversed)
 
     # v.normal, v.angle, v.rotate(), v.rotated() and v.angle_to() are defined in 2D.
@@ -139,38 +151,41 @@ class Vector(object):
         return self
 
     def _orthogonal(self):
-        """ Yields a new vector whose 2D angle is 90 degrees (perpendicular) to this vector.
-            In 3D, there would be many perpendicular vectors.
+        """Yield a new vector whose 2D angle is 90 degrees (perpendicular) to this vector.
+
+        In 3D, there would be many perpendicular vectors.
+
         """
         return Vector(self.y, -self.x, self.z)
+
     orthogonal = perpendicular = normal = property(_orthogonal)
 
-    def _get_angle(self):
+    @property
+    def angle(self):
         """ Yields the 2D direction of the vector.
         """
         return degrees(atan2(self.y, self.x))
-    def _set_angle(self, degrees):
+
+    @angle.setter
+    def angle(self, degrees):
         d = self.length
         self.x = cos(radians(degrees)) * d
         self.y = sin(radians(degrees)) * d
-    angle = direction = property(_get_angle, _set_angle)
 
     def rotate(self, degrees):
-        """ Rotates the direction of the vector in 2D.
-        """
+        """Rotate the direction of the vector in 2D."""
         self.angle += degrees
 
     def rotated(self, degrees):
-        """ Returns a copy of the vector with direction rotated in 2D.
-        """
+        """Return a copy of the vector with direction rotated in 2D."""
         v = self.copy()
         v.rotate(degrees)
         return v
 
     def angle_to(self, v):
-        """ Returns the 2D angle between two vectors.
-        """
+        """Return the 2D angle between two vectors."""
         return degrees(atan2(v.y, v.x) - atan2(self.y, self.x))
+
     angle_between = angle_to
 
     # Arithmetic operators.
@@ -958,7 +973,8 @@ def deepcopy(o):
         return o.__class__(deepcopy(v) for v in o)
     if isinstance(o, dict):
         return dict((deepcopy(k), deepcopy(v)) for k,v in o.iteritems())
-    raise Exception, "don't know how to copy %s" % o.__class__.__name__
+
+    raise Exception("don't know how to copy %s" % o.__class__.__name__)
 
 class Node(object):
 
@@ -1213,7 +1229,7 @@ class Graph(dict):
         try:
             return dict.__getitem__(self, id)
         except KeyError:
-            raise KeyError, "no node with id '%s' in graph" % id
+            raise KeyError("no node with id '%s' in graph" % id)
 
     def append(self, base, *args, **kwargs):
         """ Appends a Node or Edge to the graph: Graph.append(Node, id="rabbit").

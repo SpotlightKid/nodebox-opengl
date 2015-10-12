@@ -151,9 +151,9 @@ class PathElement(object):
         return (self.x, self.y)
 
     @xy.setter
-    def xy(self, (x,y)):
-        self.x = x
-        self.y = y
+    def xy(self, v):
+        self.x = v[0]
+        self.y = v[1]
 
     # Handle 1 describes now the curve from the previous point started.
     @property

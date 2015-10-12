@@ -29,6 +29,8 @@
 #   Added a generic callback handler.
 #   - dwh
 
+from __future__ import print_function
+
 import socket
 import struct
 import math
@@ -42,10 +44,10 @@ def hexDump(bytes):
     for i in range(len(bytes)):
         sys.stdout.write("%2x " % (ord(bytes[i])))
         if (i+1) % 8 == 0:
-            print repr(bytes[i-7:i+1])
+            print(repr(bytes[i-7:i+1]))
 
     if(len(bytes) % 8 != 0):
-        print string.rjust("", 11), repr(bytes[i-len(bytes)%8:i+1])
+        print(string.rjust("", 11), repr(bytes[i-len(bytes)%8:i+1]))
 
 
 class OSCMessage:
@@ -114,7 +116,7 @@ def readBlob(data):
 
 def readInt(data):
     if(len(data)<4):
-        print "Error: too few bytes for int", data, len(data)
+        print("Error: too few bytes for int", data, len(data))
         rest = data
         integer = 0
     else:
@@ -129,7 +131,7 @@ def readLong(data):
     """Tries to interpret the next 8 bytes of the data
     as a 64-bit signed integer."""
     high, low = struct.unpack(">ll", data[0:8])
-    big = (long(high) << 32) + low
+    big = (high << 32) + low
     rest = data[8:]
     return (big, rest)
 
@@ -137,7 +139,7 @@ def readLong(data):
 
 def readFloat(data):
     if(len(data)<4):
-        print "Error: too few bytes for float", data, len(data)
+        print("Error: too few bytes for float", data, len(data))
         rest = data
         float = 0
     else:
@@ -191,7 +193,7 @@ def parseArgs(args):
     possible) as floats or integers."""
     parsed = []
     for arg in args:
-        print arg
+        print(arg)
         arg = arg.strip()
         interpretation = None
         try:
@@ -232,7 +234,7 @@ def decodeOSC(data):
                 value, rest = table[tag](rest)
                 decoded.append(value)
         else:
-            print "Oops, typetag lacks the magic ,"
+            print("Oops, typetag lacks the magic ,")
 
     return decoded
 
@@ -267,15 +269,15 @@ class CallbackManager:
                 for msg in message :
                     self.dispatch(msg, source)
 
-        except KeyError, e:
+        except KeyError as e:
             # address not found
-            print 'address %s not found ' % address
+            print('address %s not found ' % address)
             pprint.pprint(message)
-        except IndexError, e:
-            print 'got malformed OSC message'
+        except IndexError as e:
+            print('got malformed OSC message')
             pass
-        except None, e:
-            print "Exception in", address, "callback :", e
+        except None as e:
+            print("Exception in", address, "callback :", e)
 
         return
 
@@ -297,7 +299,7 @@ class CallbackManager:
 
 if __name__ == "__main__":
     hexDump("Welcome to the OSC testing program.")
-    print
+    print()
     message = OSCMessage()
     message.setAddress("/foo/play")
     message.append(44)
@@ -306,7 +308,7 @@ if __name__ == "__main__":
     message.append("the white cliffs of dover")
     hexDump(message.getBinary())
 
-    print "Making and unmaking a message.."
+    print("Making and unmaking a message..")
 
     strings = OSCMessage()
     strings.append("Mary had a little lamb")
@@ -321,26 +323,26 @@ if __name__ == "__main__":
 
     hexDump(raw)
 
-    print "Retrieving arguments..."
+    print("Retrieving arguments...")
     data = raw
     for i in range(6):
         text, data = readString(data)
-        print text
+        print(text)
 
     number, data = readFloat(data)
-    print number
+    print(number)
 
     number, data = readFloat(data)
-    print number
+    print(number)
 
     number, data = readInt(data)
-    print number
+    print(number)
 
     hexDump(raw)
-    print decodeOSC(raw)
-    print decodeOSC(message.getBinary())
+    print(decodeOSC(raw))
+    print(decodeOSC(message.getBinary()))
 
-    print "Testing Blob types."
+    print("Testing Blob types.")
 
     blob = OSCMessage()
     blob.append("","b")
@@ -353,7 +355,7 @@ if __name__ == "__main__":
 
     hexDump(blob.getBinary())
 
-    print decodeOSC(blob.getBinary())
+    print(decodeOSC(blob.getBinary()))
 
     def printingCallback(*stuff):
         sys.stdout.write("Got: ")
@@ -361,7 +363,7 @@ if __name__ == "__main__":
             sys.stdout.write(str(i) + " ")
         sys.stdout.write("\n")
 
-    print "Testing the callback manager."
+    print("Testing the callback manager.")
 
     c = CallbackManager()
     c.add(printingCallback, "/print")
@@ -388,7 +390,7 @@ if __name__ == "__main__":
 
     bundlebinary = bundle.message
 
-    print "sending a bundle to the callback manager"
+    print("sending a bundle to the callback manager")
     c.handle(bundlebinary)
 
 
@@ -470,7 +472,7 @@ def createBinaryMsg(oscAddress, dataArray):
 
     return m.getBinary() # get the actual OSC to send
 
-def sendOSC(stufftosend, ipAddr, port): # outSocket, 
+def sendOSC(stufftosend, ipAddr, port): # outSocket,
     """ send OSC msg or bundle as binary"""
     outSocket.sendto(stufftosend, (ipAddr, port))
 
@@ -481,7 +483,7 @@ def sendOSC(stufftosend, ipAddr, port): # outSocket,
 def sendMsg(oscAddress, dataArray, ipAddr, port):#, outSocket):
     """create and send normal OSC msgs"""
     msg = createBinaryMsg(oscAddress, dataArray)
-    sendOSC(msg, ipAddr, port)  # outSocket, 
+    sendOSC(msg, ipAddr, port)  # outSocket,
 
 ############################### bundle stuff + send bundle
 
