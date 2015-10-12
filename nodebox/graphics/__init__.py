@@ -1,17 +1,21 @@
-import bezier
-import context
-import geometry
-import physics
-import shader
+# -*- coding: utf-8 -*-
 
-from noise   import noise
-from context import *
+from __future__ import absolute_import
 
-physics.line    = context.line
+from . import bezier
+from . import context
+from . import geometry
+from . import physics
+from . import shader
+from .noise import noise
+from .context import *
+
+
+physics.line = context.line
 physics.ellipse = context.ellipse
-physics.Text    = context.Text
+physics.Text = context.Text
 
-#-----------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Expose the canvas and some common canvas properties on global level.
 # Some magic constants from NodeBox are commands here:
 # - WIDTH  => width()
@@ -20,6 +24,7 @@ physics.Text    = context.Text
 
 canvas = Canvas()
 
+
 def size(width=None, height=None):
     if width is not None:
         canvas.width = width
@@ -27,13 +32,16 @@ def size(width=None, height=None):
         canvas.height = height
     return canvas.size
 
+
 def speed(fps=None):
     if fps is not None:
         canvas.fps = fps
     return canvas.fps
 
+
 def frame():
     return canvas.frame
-    
+
+
 def clear():
     canvas.clear()

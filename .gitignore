@@ -16,3 +16,9 @@ Thumbs.db
 # Temporary editor files
 *.swp
 .idea
+
+# Shared library files
+*.so
+*.dll
+*.pyd
+

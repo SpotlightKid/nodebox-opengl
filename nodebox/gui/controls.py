@@ -1,77 +1,92 @@
-#=== CONTROLS ========================================================================================
+# -*- coding: utf-8 -*-
+
+# === CONTROLS ================================================================
 # Native GUI controls.
 # Authors: Tom De Smedt
 # License: BSD (see LICENSE.txt for details).
 # Copyright (c) 2008-2012 City In A Bottle (cityinabottle.org)
 # http://cityinabottle.org/nodebox
 
-import os
+from __future__ import absolute_import, print_function
+
 from glob import glob
 from time import time
 
+from os.path import abspath, basename, dirname, join, splitext
+
 from pyglet.text.layout import IncrementalTextLayout
-from pyglet.text.caret  import Caret
+from pyglet.text.caret import Caret
 
 from nodebox.graphics.geometry import angle, distance, clamp, Bounds, INFINITE
-from nodebox.graphics import \
-    Layer, Color, Image, image, crop, rect, \
-    Text, font, NORMAL, BOLD, CENTER, DEFAULT_FONT, install_font, \
-    translate, rotate, \
-    line, DASHED, DOTTED, \
-    DEFAULT, HAND, TEXT, \
-    LEFT, RIGHT, UP, DOWN, TAB, ENTER, BACKSPACE, CTRL, SHIFT, ALT
+from nodebox.graphics import (
+    Layer, Color, Image, image, crop, rect,
+    Text, font, NORMAL, BOLD, DEFAULT_FONT, install_font,
+    translate, rotate,
+    line, DASHED, DOTTED,
+    DEFAULT, HAND, TEXT,
+    LEFT, RIGHT, UP, DOWN, TAB, ENTER, BACKSPACE, DELETE, CTRL, SHIFT, ALT)
 
-def _popdefault(dict, key, default=None):
-    """ Pops the given key from the dictionary and returns its value (or default).
-    """
-    if key in dict: 
-        return dict.pop(key)
-    return default
-    
+
 def _find(match=lambda item: False, list=[]):
-    """ Returns the first item in the list for which match(item)=True, or None.
+    """Return the first item in the list for which match(item)=True, or None.
     """
     for item in list:
-        if match(item): return item
+        if match(item):
+            return item
 
-#=====================================================================================================
 
-#--- Theme -------------------------------------------------------------------------------------------
+# =============================================================================
+
+# -- Theme --------------------------------------------------------------------
 
 class Theme(dict):
-    
+    """Defines the source images for controls and font settings for labels.
+
+    A theme is loaded from a given folder path (containing PNG images and TTF
+    font files). The default theme is in nodebox/graphics/gui/theme/ Copy this
+    folder and modify it to create a custom theme.
+
+    """
     def __init__(self, path, **kwargs):
-        """ A theme defines the source images for controls and font settings for labels.
-            A theme is loaded from a given folder path (containing PNG images and TTF font files).
-            The default theme is in nodebox/graphics/gui/theme/
-            Copy this folder and modify it to create a custom theme.
+        """Initialize the from files in given directory.
+
+        The directoy must contain all the necessary image and font files.
+        See the default themes for the standard file names.
+
         """
-        images = glob(os.path.join(path, "*.png"))
-        images = [(os.path.basename(os.path.splitext(f)[0]), f) for f in images]
-        fonts  = glob(os.path.join(path, "*.ttf"))
-        fonts  = [(os.path.basename(os.path.splitext(f)[0]), install_font(f)) for f in fonts]
-        fonts  = [f[0] for f in fonts if f[1]] # Filename is assumed to be fontname.
+        images = glob(join(path, "*.png"))
+        images = [(basename(splitext(f)[0]), f) for f in images]
+        fonts  = glob(join(path, "*.ttf"))
+        fonts  = [(basename(splitext(f)[0]), install_font(f)) for f in fonts]
+        # Filename is assumed to be fontname.
+        fonts  = [f[0] for f in fonts if f[1]]
         dict.__init__(self, images)
-        self["fonts"]      = fonts
-        self["fontname"]   = kwargs.get("fontname", fonts and fonts[-1] or DEFAULT_FONT)
-        self["fontsize"]   = kwargs.get("fontsize", 10)
+        self["fonts"] = fonts
+        self["fontname"] = kwargs.get("fontname",
+                                      fonts[-1] if fonts else DEFAULT_FONT)
+        self["fontsize"] = kwargs.get("fontsize", 10)
         self["fontweight"] = kwargs.get("fontweight", NORMAL)
-        self["text"]       = kwargs.get("text", Color(1.0))
+        self["text"] = kwargs.get("text", Color(1.0))
 
-theme = Theme(os.path.join(os.path.dirname(os.path.abspath(__file__)), "theme")) 
 
-#=====================================================================================================
+theme = Theme(join(dirname(abspath(__file__)), "theme"))
 
-#--- Control -----------------------------------------------------------------------------------------
+
+# =============================================================================
+
+# -- Control ------------------------------------------------------------------
 
 class Control(Layer):
-    
+
     def __init__(self, x=0, y=0, id=None, color=(1,1,1,1), **kwargs):
-        """ Base class for GUI controls.
-            The Control class inherits from Layer so it must be appended to the canvas (or a container)
-            to receive events and get drawn.
-            An id can be given to uniquely identify the control.
-            If the control is part of a Panel, it can be retrieved with Panel.control_id.
+        """Base class for GUI controls.
+
+        The Control class inherits from Layer so it must be appended to the
+        canvas (or a container) to receive events and get drawn.
+
+        An id can be given to uniquely identify the control. If the control is
+        part of a Panel, it can be retrieved with Panel.control_id.
+
         """
         Layer.__init__(self, x=x, y=y, **kwargs)
         self.id        = id
@@ -87,86 +102,96 @@ class Control(Layer):
     @property
     def width(self):
         return self._get_width()
+
     @property
     def height(self):
         return self._get_height()
 
-    def on_mouse_enter(self, mouse): 
+    def on_mouse_enter(self, mouse):
         mouse.cursor = HAND
-    def on_mouse_leave(self, mouse): 
+
+    def on_mouse_leave(self, mouse):
         mouse.cursor = DEFAULT
-        
+
     def on_mouse_press(self, mouse):
-        # Fire Control.on_mouse_doubleclick() when mouse is pressed twice in same location.
-        # Subclasses need to call this method in their overridden on_mouse_press().
-        if  self._press and \
-        abs(self._press[0] - mouse.x) < 2 and \
-        abs(self._press[1] - mouse.y) < 2 and \
-            self._press[2] == mouse.button and \
-            self._press[3] == mouse.modifiers and \
-            self._press[4] - time() > -0.4:
+        # Fire Control.on_mouse_doubleclick() when mouse is pressed twice
+        # in same location.
+        # Subclasses need to call this method in their overridden
+        # on_mouse_press().
+        if  (self._press and
+                abs(self._press[0] - mouse.x) < 2 and
+                abs(self._press[1] - mouse.y) < 2 and
+                self._press[2] == mouse.button and
+                self._press[3] == mouse.modifiers and
+                self._press[4] - time() > -0.4):
             self._press = None
             self.on_mouse_doubleclick(mouse)
         self._press = (mouse.x, mouse.y, mouse.button, mouse.modifiers, time())
-        
+
     def on_mouse_doubleclick(self, mouse):
         pass
-        
+
     def on_key_press(self, keys):
-        for control in self: 
+        for control in self:
             control.on_key_press(keys)
+
     def on_key_release(self, keys):
-        for control in self: 
+        for control in self:
             control.on_key_release(keys)
-    
+
     def on_action(self):
-        """ Override this method with a custom action.
-        """
+        """Override this method with a custom action."""
         pass
-        
+
     def reset(self):
         pass
 
     def _draw(self):
         Layer._draw(self)
-    
+
     # Control._pack() is called internally to layout child controls.
     # This should not happen in Control.update(), which is called every frame.
     def _pack(self):
         pass
 
     # With transformed=True, expensive matrix transformations are done.
-    # Turn off, controls are not meant to be rotated or scaled.        
-    def layer_at(self, x, y, clipped=False, enabled=False, transformed=True, _covered=False):
+    # Turn off, controls are not meant to be rotated or scaled.
+    def layer_at(self, x, y, clipped=False, enabled=False, transformed=True,
+                 _covered=False):
         return Layer.layer_at(self, x, y, clipped, enabled, False, _covered)
 
-    def origin(self, x=None, y=None, relative=False): 
-        return Layer.origin(self, x, y, relative)       
-    def rotate(self, angle): 
+    def origin(self, x=None, y=None, relative=False):
+        return Layer.origin(self, x, y, relative)
+
+    def rotate(self, angle):
         pass
-    def scale(self, f): 
+
+    def scale(self, f):
         pass
-    
+
     def __getattr__(self, k):
         # Yields the property with the given name, or
         # yields the child control with the given id.
-        if k in self.__dict__: 
+        if k in self.__dict__:
             return self.__dict__[k]
         ctrl = nested(self, k)
         if ctrl is not None:
             return ctrl
-        raise AttributeError, "'%s' object has no attribute '%s'" % (self.__class__.__name__, k)
-        
+        raise AttributeError("'%s' object has no attribute '%s'" %
+                             (self.__class__.__name__, k))
+
     def __repr__(self):
         return "%s(id=%s%s)" % (
             self.__class__.__name__,
             repr(self.id),
             hasattr(self, "value") and ", value="+repr(self.value) or ""
         )
-        
+
 def nested(control, id):
-    """ Returns the child Control with the given id, or None.
-        Also searches all child Layout containers.
+    """Return the child Control with the given id, or None.
+
+    Also searches all child Layout containers.
+
     """
     # First check the Control._controls cache (=> 10x faster).
     # Also check if the control's id changed after it was cached (however unlikely).
@@ -184,53 +209,66 @@ def nested(control, id):
             m = ctrl; break
         if isinstance(ctrl, Layout):
             m = nested(ctrl, id)
-            if m is not None: 
+            if m is not None:
                 break
     # If a control was found, cache it.
     if m is not None:
         control._controls[id] = m
     return m
 
-#=====================================================================================================
+# =============================================================================
 
-#--- Label -------------------------------------------------------------------------------------------
+# -- Label --------------------------------------------------------------------
 
 class Label(Control):
-    
-    def __init__(self, caption, x=0, y=0, width=None, height=None, id=None, **kwargs):
-        """ A label displaying the given caption, centered in the label's (width, height)-box.
-            The label does not receive any events.
-            Optional parameters can include fill, font, fontsize, fontweight.
+    """A label displays a given caption, centered in the label's box.
+
+    The label does not receive any events.
+
+    """
+    def __init__(self, caption, x=0, y=0, width=None, height=None, id=None,
+                 **kwargs):
+        """Create a label with the given caption.
+
+        Accepts the same keyword arguments as Control, i.e. x, y, and id.
+        The dimension can be given with width, height.
+
+        Additional, optional keyword parameters are align, fill, font,
+        fontsize, fontweight and lineheight.
+
         """
         txt = Text(caption, **{
-               "fill" : _popdefault(kwargs, "fill", theme["text"]),
-               "font" : _popdefault(kwargs, "font", theme["fontname"]),
-           "fontsize" : _popdefault(kwargs, "fontsize", theme["fontsize"]),
-         "fontweight" : _popdefault(kwargs, "fontweight", theme["fontweight"]),
-         "lineheight" : 1,
-              "align" : CENTER
+            "fill": kwargs.pop("fill", theme["text"]),
+            "font": kwargs.pop("font", theme["fontname"]),
+            "fontsize": kwargs.pop("fontsize", theme["fontsize"]),
+            "fontweight": kwargs.pop("fontweight", theme["fontweight"]),
+            "lineheight": 1,
+            "align": CENTER
         })
         kwargs.setdefault("width", txt.metrics[0])
         kwargs.setdefault("height", txt.metrics[1])
         Control.__init__(self, x=x, y=y, id=id, **kwargs)
         self.enabled = False # Pass on events to the layers underneath.
-        self._text   = txt
-        self._pack()      
+        self._text = txt
+        self._pack()
 
-    def _get_caption(self):
+    @property
+    def caption(self):
         return self._text.text
-    def _set_caption(self, string):
+
+    @caption.setter
+    def caption(self, string):
         self._text.text = string
         self._pack()
-        
-    caption = property(_get_caption, _set_caption)
 
     @property
     def font(self):
         return self._text.font
+
     @property
     def fontsize(self):
         return self._text.fontsize
+
     @property
     def fontweight(self):
         return self._text.fontweight
@@ -243,57 +281,66 @@ class Label(Control):
     def draw(self):
         self._text.draw()
 
-#=====================================================================================================
+# =============================================================================
 
-#--- BUTTON ------------------------------------------------------------------------------------------
+# -- BUTTON -------------------------------------------------------------------
 
 class Button(Control):
-    
-    def __init__(self, caption="", action=None, x=0, y=0, width=125, id=None, **kwargs):
-        """ A clickable button that will fire Button.on_action() when clicked.
-            The action handler can be defined in a subclass, or given as a function.
+
+    def __init__(self, caption="", action=None, x=0, y=0, width=125, id=None,
+                 **kwargs):
+        """A clickable button that will fire Button.on_action() when clicked.
+
+        The action handler can be defined in a subclass, or given as a
+        function.
+
         """
         Control.__init__(self, x=x, y=y, width=width, id=id, **kwargs)
         img, w = Image(theme["button"]), 20
         self.src = {
-            "face" : crop(img, w, 0, 1, img.height),
-            "cap1" : crop(img, 0, 0, w, img.height),
-            "cap2" : crop(img, img.width-w, 0, w, img.height),
+            "face": crop(img, w, 0, 1, img.height),
+            "cap1": crop(img, 0, 0, w, img.height),
+            "cap2": crop(img, img.width-w, 0, w, img.height),
         }
+
         if action:
             # Override the Button.on_action() method from the given function.
             self.set_method(action, name="on_action")
-        _popdefault(kwargs, "width")
-        _popdefault(kwargs, "height")
+
+        kwargs.pop("width", None)
+        kwargs.pop("height", None)
         self.append(Label(caption, **kwargs))
         self._pack()
-    
-    def _get_caption(self): 
+
+    @property
+    def caption(self):
         return self[0].caption
-    def _set_caption(self, string):
+
+    @caption.setter
+    def caption(self, string):
         self[0].caption = string
         self._pack()
-        
-    caption = property(_get_caption, _set_caption)
-    
+
     def _pack(self):
         # Button size can not be smaller than its caption.
         w = max(self.width, self[0].width + self[0].fontsize * 2)
         self._set_width(w)
         self._set_height(self.src["face"].height)
-    
+
     def update(self):
         # Center the text inside the button.
-        # This happens each frame because the position changes when the button is pressed.
+        # This happens each frame because the position changes when the button
+        # is pressed.
         self[0].x = 0.5 * (self.width - self[0].width)
         self[0].y = 0.5 * (self.height - self[0].height) - self.pressed
 
     def draw(self):
-        clr = self.pressed and [v*0.75 for v in self.color] or self.color
+        clr = [v * 0.75 for v in self.color] if self.pressed else self.color
         im1, im2, im3 = self.src["cap1"], self.src["cap2"], self.src["face"]
         image(im1, 0, 0, height=self.height, color=clr)
         image(im2, x=self.width-im2.width, height=self.height, color=clr)
-        image(im3, x=im1.width, width=self.width-im1.width-im2.width, height=self.height, color=clr)
+        image(im3, x=im1.width, width=self.width-im1.width-im2.width,
+              height=self.height, color=clr)
 
     def on_mouse_release(self, mouse):
         Control.on_mouse_release(self, mouse)
@@ -301,15 +348,18 @@ class Button(Control):
             # Only fire event if mouse is actually released on the button.
             self.on_action()
 
-#--- ACTION ------------------------------------------------------------------------------------------
+# -- ACTION -------------------------------------------------------------------
 
 class Action(Control):
-    
+
     def __init__(self, action=None, x=0, y=0, id=None, **kwargs):
-        """ A clickable button that will fire Action.on_action() when clicked.
-            Actions display an icon instead of a text caption.
-            Actions are meant to be used for interface management:
-            e.g. closing or minimizing a panel, navigating to the next page, ...
+        """A clickable button that will fire Action.on_action() when clicked.
+
+        Actions display an icon instead of a text caption.
+
+        Actions are meant to be used for interface management: e.g. closing or
+        minimizing a panel, navigating to the next page, ...
+
         """
         Control.__init__(self, x=x, y=y, id=id, **kwargs)
         self.src = {"face": Image(theme["action"])}
@@ -317,62 +367,70 @@ class Action(Control):
         if action:
             # Override the Button.on_action() method from the given function.
             self.set_method(action, name="on_action")
-    
+
     def _pack(self):
         self._set_width(self.src["face"].width)
         self._set_height(self.src["face"].height)
-    
+
     def draw(self):
-        clr = self.pressed and [v*0.75 for v in self.color] or self.color
+        clr = [v * 0.75 for v in self.color] if self.pressed else self.color
         image(self.src["face"], 0, 0, color=clr)
-            
+
     def on_mouse_release(self, mouse):
         Control.on_mouse_release(self, mouse)
         if self.contains(mouse.x, mouse.y, transformed=False):
             # Only fire event if mouse is actually released on the button.
             self.on_action()
-        
+
+
 class Close(Action):
-    
+
     def __init__(self, action=None, x=0, y=0, id=None, **kwargs):
-        """ An action that hides the parent control (e.g. a Panel) when pressed.
+        """An action that hides the parent control (e.g. a Panel) when pressed.
         """
         Action.__init__(self, action, x=x, y=y, id=id, **kwargs)
         self.src["face"] = Image(theme["action-close"])
-        
+
     def on_action(self):
         self.parent.hidden = True
 
-#=====================================================================================================
 
-#--- SLIDER ------------------------------------------------------------------------------------------
+# =============================================================================
+
+# -- SLIDER -------------------------------------------------------------------
 
 class Handle(Control):
-    
+
     def __init__(self, parent):
         # The slider handle can protrude from the slider bar,
         # so it is a separate layer that fires its own events.
-        Control.__init__(self,
-            width = parent.src["handle"].width,
-           height = parent.src["handle"].height)
+        Control.__init__(self, width=parent.src["handle"].width,
+                         height=parent.src["handle"].height)
         self.parent = parent
-        
+
     def on_mouse_press(self, mouse):
         self.parent.on_mouse_press(mouse)
+
     def on_mouse_drag(self, mouse):
         self.parent.on_mouse_drag(mouse)
+
     def on_mouse_release(self, mouse):
         self.parent.on_mouse_release(mouse)
-        
+
     def draw(self):
-        clr = self.parent.pressed | self.pressed and [v*0.75 for v in self.color] or self.color
+        clr = ([v * 0.75 for v in self.color]
+               if self.parent.pressed or self.pressed else self.color)
         image(self.parent.src["handle"], 0, 0, color=clr)
 
+
 class Slider(Control):
-    
-    def __init__(self, default=0.5, min=0.0, max=1.0, steps=100, x=0, y=0, width=125, id=None, **kwargs):
-        """ A draggable slider that will fire Slider.on_action() when dragged.
-            The slider's value can be retrieved with Slider.value.
+
+    def __init__(self, default=0.5, min=0.0, max=1.0, steps=100, x=0, y=0,
+                 width=125, id=None, **kwargs):
+        """A draggable slider that will fire Slider.on_action() when dragged.
+
+        The slider's value can be retrieved with Slider.value.
+
         """
         Control.__init__(self, x=x, y=y, width=width, id=id, **kwargs)
         self.min     = min     # Slider minimum value.
@@ -392,17 +450,18 @@ class Slider(Control):
         self.append(Handle(self))
         self._pack()
 
-    def _get_value(self):
-        return self.min + self._t * (self.max-self.min)
-    def _set_value(self, value):
-        self._t = clamp(float(value-self.min) / (self.max-self.min or -1), 0.0, 1.0)
-        
-    value = property(_get_value, _set_value)
-        
+    @property
+    def value(self):
+        return self.min + self._t * (self.max - self.min)
+
+    @value.setter
+    def value(self, value):
+        self._t = clamp(float(value - self.min) / (self.max - self.min or -1),
+                        0.0, 1.0)
+
     @property
     def relative(self):
-        """ Yields the slider position as a relative number (0.0-1.0).
-        """
+        """Yield the slider position as a relative number (0.0-1.0)."""
         return self._t
 
     def _pack(self):
@@ -413,16 +472,17 @@ class Slider(Control):
     def reset(self):
         Control.reset(self)
         self.value = self.default
-    
+
     def update(self):
-        # Update the handle's position, before Slider.draw() occurs (=smoother).
+        # Update the handle's position, before Slider.draw() occurs (=smoother)
         self[0].x = self._t * self.width - 0.5 * self[0].width
         self[0].y = 0.5 * (self.height - self[0].height)
-    
+
     def draw(self):
         t = self._t * self.width
-        im1, im2, im3, im4  = self.src["cap1"], self.src["cap2"], self.src["face1"], self.src["face2"]
         clr = self.color
+        im1, im2, im3, im4 = (self.src["cap1"], self.src["cap2"],
+                              self.src["face1"], self.src["face2"])
         image(im1, x=0, y=0, color=clr)
         image(im2, x=self.width-im2.width, y=0, color=clr)
         image(im3, x=im1.width, y=0, width=t-im1.width, color=clr)
@@ -434,24 +494,28 @@ class Slider(Control):
         # Calculate relative value from the slider handle position.
         # The inner width is a bit smaller to accomodate for the slider handle.
         # Clamp the relative value to the nearest step.
-        self._t = (mouse.x-x0-self.height*0.5) / float(self.width-self.height)
-        self._t = self._t - self._t % step + step 
+        self._t = ((mouse.x - x0 - self.height * 0.5) /
+                   float(self.width - self.height))
+        self._t = self._t - self._t % step + step
         self._t = clamp(self._t, 0.0, 1.0)
         self.on_action()
-    
+
     def on_mouse_drag(self, mouse):
         self.on_mouse_press(mouse)
 
-#=====================================================================================================
 
-#--- KNOB --------------------------------------------------------------------------------------------
+# =============================================================================
+
+# -- KNOB ---------------------------------------------------------------------
 
 class Knob(Control):
-    
+
     def __init__(self, default=0, limit=True, x=0, y=0, id=None, **kwargs):
-        """ A twistable knob that will fire Knob.on_action() when dragged.
-            The knob's angle can be retrieved with Knob.value (in degrees, 0-360).
-            With CTRL pressed, twists by a very small amount.
+        """A twistable knob that will fire Knob.on_action() when dragged.
+
+        The knob's angle can be retrieved with Knob.value (in degrees, 0-360).
+        With CTRL pressed, twists by a very small amount.
+
         """
         Control.__init__(self, x=x, y=y, id=id, **kwargs)
         self.default = default # Knob default angle.
@@ -462,7 +526,7 @@ class Knob(Control):
           "socket" : Image(theme["knob-socket"]),
         }
         self._pack()
-        
+
     @property
     def relative(self):
         """ Yields the knob's angle as a relative number (0.0-1.0).
@@ -479,27 +543,27 @@ class Knob(Control):
 
     def draw(self):
         clr1 = self.color
-        clr2 = self.pressed and [v*0.85 for v in self.color] or self.color
+        clr2 = [v * 0.85 for v in self.color] if self.pressed else self.color
         translate(self.width/2, self.height/2)
         image(self.src["socket"], -self.width/2, -self.height/2, color=clr1)
         rotate(360-self.value)
         image(self.src["face"], -self.width/2, -self.height/2, color=clr2)
-        
+
     def on_mouse_press(self, mouse):
         self.value += mouse.dy * (CTRL in mouse.modifiers and 1 or 5)
         if self._limit:
             self.value %= 360
         self.on_action()
-    
+
     def on_mouse_drag(self, mouse):
         self.on_mouse_press(mouse)
 
-#=====================================================================================================
+# =============================================================================
 
-#--- FLAG --------------------------------------------------------------------------------------------
+# -- FLAG ---------------------------------------------------------------------
 
 class Flag(Control):
-    
+
     def __init__(self, default=False, x=0, y=0, id=None, **kwargs):
         """ A checkbox control that fires Flag.on_action() when checked.
             The checkbox value can be retrieved with Flag.value.
@@ -512,18 +576,18 @@ class Flag(Control):
          "checked" : Image(theme["flag-checked"]),
         }
         self._pack()
-        
+
     def _pack(self):
         self._set_width(self.src["face"].width)
         self._set_height(self.src["face"].height)
-    
+
     def reset(self):
         self.value = self.default
-    
+
     def draw(self):
         clr = self.color
         image(self.value and self.src["checked"] or self.src["face"], color=clr)
-        
+
     def on_mouse_release(self, mouse):
         Control.on_mouse_release(self, mouse)
         if self.contains(mouse.x, mouse.y, transformed=False):
@@ -533,15 +597,15 @@ class Flag(Control):
 
 Checkbox = CheckBox = Flag
 
-#=====================================================================================================
+# =============================================================================
 
-#--- Editable ----------------------------------------------------------------------------------------
+# -- Editable -----------------------------------------------------------------
 
 EDITING = None
 editing = lambda: EDITING
 
 class Editable(Control):
-    
+
     def __init__(self, value="", x=0, y=0, width=125, height=20, padding=(0,0), wrap=False, id=None, **kwargs):
         """ An editable text box.
             When clicked, it has the focus and can receive keyboard events.
@@ -549,11 +613,11 @@ class Editable(Control):
             Optional parameters can include fill, font, fontsize, fontweight.
         """
         txt = Text(value or " ", **{
-               "fill" : _popdefault(kwargs, "fill", Color(0,0.9)),
-               "font" : _popdefault(kwargs, "font", theme["fontname"]),
-           "fontsize" : _popdefault(kwargs, "fontsize", theme["fontsize"]),
-         "fontweight" : _popdefault(kwargs, "fontweight", theme["fontweight"]),
-         "lineheight" : _popdefault(kwargs, "lineheight", wrap and 1.25 or 1.0),
+               "fill" : kwargs.pop("fill", Color(0,0.9)),
+               "font" : kwargs.pop("font", theme["fontname"]),
+           "fontsize" : kwargs.pop("fontsize", theme["fontsize"]),
+         "fontweight" : kwargs.pop("fontweight", theme["fontweight"]),
+         "lineheight" : kwargs.pop("lineheight", wrap and 1.25 or 1.0),
               "align" : LEFT
         })
         kwargs["width"]  = width
@@ -571,7 +635,7 @@ class Editable(Control):
         self._editor.caret.visible = False
         self._editing = False # When True, cursor is blinking and text can be edited.
         Editable._pack(self)  # On init, call Editable._pack(), not the derived Field._pack().
-        
+
     def _pack(self):
         self._editor.x = self._padding[0]
         self._editor.y = self._padding[1]
@@ -587,7 +651,7 @@ class Editable(Control):
         self._editor.document.text = string or " "
         self._editor.end_update()
         self._empty = string == "" and True or False
-        
+
     value = property(_get_value, _set_value)
 
     def _get_editing(self):
@@ -607,7 +671,7 @@ class Editable(Control):
                 layer.traverse(visit=lambda layer: \
                     isinstance(layer, Editable) and layer != self and \
                         setattr(layer, "editing", False))
-                        
+
     editing = property(_get_editing, _set_editing)
 
     @property
@@ -615,17 +679,17 @@ class Editable(Control):
         # Yields a (start, stop)-tuple with the indices of the current selected text.
         return (self._editor.selection_start,
                 self._editor.selection_end)
-    
+
     @property
     def selected(self):
         # Yields True when text is currently selected.
         return self.selection[0] != self.selection[1]
-        
+
     @property
     def cursor(self):
         # Yields the index at the text cursor (caret).
         return self._editor.caret.position
-    
+
     def index(self, x, y):
         """ Returns the index of the character in the text at position x, y.
         """
@@ -636,22 +700,25 @@ class Editable(Control):
         if self._empty:
             i = 0
         return i
-    
+
     def on_mouse_enter(self, mouse):
         mouse.cursor = TEXT
-        
+
     def on_mouse_press(self, mouse):
         i = self._i = self.index(mouse.x, mouse.y)
         self._editor.set_selection(0, 0)
         self.editing = True
         self._editor.caret.position = i
         Control.on_mouse_press(self, mouse)
-        
+
     def on_mouse_release(self, mouse):
-        if not self.dragged:
+        if self._editor.selection_end:
+            self._editor.caret.position = self._editor.selection_end
+            self._editor.caret.visible = True
+        elif not self.dragged:
             self._editor.caret.position = self.index(mouse.x, mouse.y)
         Control.on_mouse_release(self, mouse)
-        
+
     def on_mouse_drag(self, mouse):
         i = self.index(mouse.x, mouse.y)
         self._editor.selection_start = max(min(self._i, i), 0)
@@ -660,7 +727,7 @@ class Editable(Control):
         Control.on_mouse_drag(self, mouse)
 
     def on_mouse_doubleclick(self, mouse):
-        # Select the word at the mouse position. 
+        # Select the word at the mouse position.
         # Words are delimited by non-alphanumeric characters.
         i = self.index(mouse.x, mouse.y)
         delimiter = lambda ch: not (ch.isalpha() or ch.isdigit())
@@ -678,7 +745,8 @@ class Editable(Control):
         if self._editing:
             self._editor.caret.visible = True
             i = self._editor.caret.position
-            if   keys.code == LEFT:
+
+            if keys.code == LEFT:
                 # The left arrow moves the text cursor to the left.
                 self._editor.caret.position = max(i-1, 0)
             elif keys.code == RIGHT:
@@ -702,7 +770,7 @@ class Editable(Control):
                 self._editor.caret.position = 0
                 self.editing = False
                 self.on_action()
-            elif keys.code == BACKSPACE and self.selected:
+            elif keys.code in (BACKSPACE, DELETE) and self.selected:
                 # The backspace key removes the current text selection.
                 self.value = self.value[:self.selection[0]] + self.value[self.selection[1]:]
                 self._editor.caret.position = max(self.selection[0], 0)
@@ -710,6 +778,9 @@ class Editable(Control):
                 # The backspace key removes the character at the text cursor.
                 self.value = self.value[:i-1] + self.value[i:]
                 self._editor.caret.position = max(i-1, 0)
+            elif keys.code == DELETE and i < len(self.value):
+                # The delete key removes the character to the right of text cursor.
+                self.value = self.value[:i] + self.value[i+1:]
             elif keys.char:
                 if self.selected:
                     # Typing replaces any text currently selected.
@@ -719,15 +790,17 @@ class Editable(Control):
                 ch = ch.replace("\r", "\n\r")
                 self.value = self.value[:i] + ch + self.value[i:]
                 self._editor.caret.position = min(i+1, len(self.value))
+
             self._editor.set_selection(0, 0)
-    
+
     def draw(self):
         self._editor.draw()
 
-#--- Field -------------------------------------------------------------------------------------------
+
+# --- Field -------------------------------------------------------------------
 
 class Field(Editable):
-    
+
     def __init__(self, value="", hint="", action=None, x=0, y=0, width=125, padding=5, id=None, **kwargs):
         """ A single-line text input field.
             The string value can be retrieved with Field.value.
@@ -756,7 +829,7 @@ class Field(Editable):
         return self[0].caption
     def _set_hint(self, string):
         self[0].caption = string
-        
+
     hint = property(_get_hint, _set_hint)
 
     def reset(self):
@@ -775,13 +848,13 @@ class Field(Editable):
         self[0].x = self._padding[0]
         self[0].y = self.height - self._padding[1] - self[0]._text.metrics[1] * 1.25
         self[0]._pack()
-    
+
     def on_action(self):
         pass
-        
+
     def update(self):
         self[0].hidden = self.editing or self.value != ""
-    
+
     def draw(self):
         im1, im2, im3 = self.src["cap1"], self.src["cap2"],  self.src["top"]
         im4, im5, im6 = self.src["cap3"], self.src["cap4"],  self.src["bottom"]
@@ -798,12 +871,12 @@ class Field(Editable):
         image(im9, im4.width, im6.height, width=self.width-im7.width-im8.width, height=self.height-im3.height-im6.height, color=clr)
         Editable.draw(self)
 
-#=====================================================================================================
+# =============================================================================
 
-#--- Rulers ------------------------------------------------------------------------------------------
+# -- Rulers -------------------------------------------------------------------
 
 class Rulers(Control):
-    
+
     def __init__(self, step=10, interval=5, crosshair=False, color=(0,0,0,1)):
         """ A horizontal and vertical ruler displaying the width/height of the parent at intervals.
             A measurement line is drawn at each step(e.g. at 10 20 30...)
@@ -818,23 +891,23 @@ class Rulers(Control):
         self._dirty    = False
         self._markers  = {}
         self._pack()
-    
+
     def _get_step(self):
         return self._step
     def _set_step(self, v):
         self._step = round(v)
         self._dirty = True
-        
+
     step = property(_get_step, _set_step)
-    
+
     def _get_interval(self):
         return self._interval
     def _set_interval(self, v):
         self._interval = round(v)
         self._dirty = True
-        
+
     interval = property(_get_interval, _set_interval)
-    
+
     def _pack(self):
         # Cache Text objects for the measurement markers.
         # This happens whenever the canvas resizes, or the step or interval changes.
@@ -847,68 +920,73 @@ class Rulers(Control):
             for i in range(int(round(max(self.width, self.height) / self._step))):
                 if i % self._interval == 0:
                     self._markers.setdefault(i*self._step,
-                        Text(str(int(round(i*self._step))), 
+                        Text(str(int(round(i*self._step))),
                             fontname = theme["fontname"],
                             fontsize = theme["fontsize"] * 0.6,
                                 fill = self.color))
-                            
+
     def update(self):
         self._pack()
-    
+
     def draw(self):
         length = 5
         # Draw the horizontal ruler.
         for i in range(1, int(round(self.height / self._step))):
             v, mark = i*self._step, i%self.interval==0
-            line(0, v, mark and length*3 or length, v, 
-                     stroke = self.color, 
+            line(0, v, mark and length*3 or length, v,
+                     stroke = self.color,
                 strokewidth = 0.5)
             if mark:
                 self._markers[v].draw(length*3-self._markers[v].metrics[0], v+2)
         # Draw the vertical ruler.
         for i in range(1, int(round(self.width / self._step))):
             v, mark = i*self._step, i%self.interval==0
-            line(v, 0, v, mark and length*3 or length, 
-                     stroke = self.color, 
+            line(v, 0, v, mark and length*3 or length,
+                     stroke = self.color,
                 strokewidth = 0.5)
             if mark:
                 self._markers[v].draw(v+2, length*3-self._markers[v].fontsize)
         # Draw the crosshair.
         if self.crosshair:
-            line(0, self.canvas.mouse.y, self.width, self.canvas.mouse.y, 
-                     stroke = self.color, 
-                strokewidth = 0.5, 
+            line(0, self.canvas.mouse.y, self.width, self.canvas.mouse.y,
+                     stroke = self.color,
+                strokewidth = 0.5,
                 strokestyle = DOTTED)
-            line(self.canvas.mouse.x, 0, self.canvas.mouse.x, self.height, 
-                     stroke = self.color, 
-                strokewidth = 0.5, 
+            line(self.canvas.mouse.x, 0, self.canvas.mouse.x, self.height,
+                     stroke = self.color,
+                strokewidth = 0.5,
                 strokestyle = DOTTED)
 
-#=====================================================================================================
+# =============================================================================
 
-#--- PANEL -------------------------------------------------------------------------------------------    
+# -- PANEL --------------------------------------------------------------------
 
 class Panel(Control):
-    
-    def __init__(self, caption="", fixed=False, modal=True, x=0, y=0, width=175, height=250, **kwargs):
-        """ A panel containing other controls that can be dragged when Panel.fixed=False.
-            Controls or (Layout groups) can be added with Panel.append().
+
+    def __init__(self, caption="", fixed=False, modal=True, x=0, y=0,
+                 width=175, height=250, **kwargs):
+        """A panel containing other controls that can optonally be dragged.
+
+        Set Panel.fixed = True (defaults to False) to allow a panel to be
+        dragged.
+
+        Controls or (Layout groups) can be added with Panel.append().
+
         """
-        Control.__init__(self, x=x, y=y, width=max(width,60), height=max(height,60), **kwargs)
+        Control.__init__(self, x=x, y=y, width=max(width,60),
+                         height=max(height,60), **kwargs)
         img, w = Image(theme["panel"]), 30
         self.src = {
-           "cap1" : crop(img, 0, img.height-w, w, w),
-           "cap2" : crop(img, img.width-w, img.height-w, w, w),
-           "cap3" : crop(img, 0, 0, w, w),
-           "cap4" : crop(img, img.width-w, 0, w, w),
-            "top" : crop(img, w+1, img.height-w, 1, w),
-         "bottom" : crop(img, w+1, 0, 1, w),
-           "left" : crop(img, 0, w+1, w, 1),
-          "right" : crop(img, img.width-w, w+1, w, 1),
-           "face" : crop(img, w+1, w+1, 1, 1)
+            "cap1": crop(img, 0, img.height-w, w, w),
+            "cap2": crop(img, img.width-w, img.height-w, w, w),
+            "cap3": crop(img, 0, 0, w, w),
+            "cap4": crop(img, img.width-w, 0, w, w),
+            "top": crop(img, w+1, img.height-w, 1, w),
+            "bottom": crop(img, w+1, 0, 1, w),
+            "left": crop(img, 0, w+1, w, 1),
+            "right": crop(img, img.width-w, w+1, w, 1),
+            "face": crop(img, w+1, w+1, 1, 1)
         }
-        _popdefault(kwargs, "width")
-        _popdefault(kwargs, "height")
         self.append(Label(caption))
         self.append(Close())
         #self.extend(kwargs.pop("controls", []), **kwargs)
@@ -921,14 +999,14 @@ class Panel(Control):
     def _set_caption(self, str):
         self._caption.text = str
         self._pack()
-        
+
     caption = property(_get_caption, _set_caption)
 
     @property
     def controls(self):
         return iter(self[2:]) # self[0] is the Label,
                               # self[1] is the Close action.
-    
+
     def insert(self, i, control):
         """ Inserts the control, or inserts all controls in the given Layout.
         """
@@ -936,11 +1014,11 @@ class Panel(Control):
             # If the control is actually a Layout (e.g. ordered group of controls), apply it.
             control.apply()
         Layer.insert(self, i, control)
-        
+
     def append(self, control):
         self.insert(len(self), control)
     def extend(self, controls):
-        for control in controls: 
+        for control in controls:
             self.append(control)
 
     def _pack(self):
@@ -950,7 +1028,7 @@ class Panel(Control):
         self[0].y = self.height - self.src["top"].height + 0.5 * (self.src["top"].height - self[0].height)
         self[1].x = self.width - self[1].width - 4
         self[1].y = self.height - self[1].height - 2
-        
+
     def pack(self, padding=20):
         """ Resizes the panel to the most compact size,
             based on the position and size of the controls in the panel.
@@ -966,11 +1044,11 @@ class Panel(Control):
         self._set_width( padding + self._b.width  + padding)
         self._set_height(padding + self._b.height + padding + self.src["top"].height)
         self._pack()
-    
+
     def update(self):
         self[1].hidden = self.modal
         self[1].color  = self.color
-    
+
     def draw(self):
         im1, im2, im3 = self.src["cap1"], self.src["cap2"],  self.src["top"]
         im4, im5, im6 = self.src["cap3"], self.src["cap4"],  self.src["bottom"]
@@ -985,8 +1063,8 @@ class Panel(Control):
         image(im7, 0, im4.height, height=self.height-im1.height-im4.height, color=clr)
         image(im8, self.width-im8.width, im4.height, height=self.height-im2.height-im5.height, color=clr)
         image(im9, im4.width, im6.height, width=self.width-im7.width-im8.width, height=self.height-im3.height-im6.height, color=clr)
-        
-    def on_mouse_enter(self, mouse): 
+
+    def on_mouse_enter(self, mouse):
         mouse.cursor = DEFAULT
 
     def on_mouse_press(self, mouse):
@@ -997,14 +1075,14 @@ class Panel(Control):
             self.x += mouse.dx
             self.y += mouse.dy
         self.dragged = self._dragged
-    
+
     def open(self):
         self.hidden = False
     def close(self):
         self.hidden = True
 
 class Dock(Panel):
-    
+
     def __init__(self, caption="", anchor=LEFT, fixed=True, modal=True, **kwargs):
         """ A panel attached to the edge of the canvas (LEFT or RIGHT), extending the full height.
             With fixed=False, it can be snapped from the edge and dragged as a normal panel.
@@ -1014,7 +1092,7 @@ class Dock(Panel):
         Panel.__init__(self, caption=caption, fixed=fixed, modal=modal, **kwargs)
         self.anchor = anchor
         self.snap   = 1
-    
+
     def update(self):
         Panel.update(self)
         if self.canvas is not None:
@@ -1029,7 +1107,7 @@ class Dock(Panel):
                     self._dragged = False
                 self.x = self.canvas.width  - self.width
                 self.y = self.canvas.height - self.height
-            
+
     def draw(self):
         im1, im2 = self.src["top"], self.src["face"]
         if self.canvas is not None and \
@@ -1041,14 +1119,14 @@ class Dock(Panel):
         else:
             Panel.draw(self)
 
-#=====================================================================================================
+# =============================================================================
 
-#--- Layout ------------------------------------------------------------------------------------------
+# --- Layout ------------------------------------------------------------------
 
 class Layout(Layer):
-    
+
     SPACING = 10 # Spacing between controls in a Layout.
-    
+
     def __init__(self, controls=[], x=0, y=0, **kwargs):
         """ A group of controls with a specific layout.
             Controls can be added with Layout.append().
@@ -1069,24 +1147,24 @@ class Layout(Layer):
             # If the control is actually a Layout (e.g. ordered group of controls), apply it.
             control.apply()
         Layer.insert(self, i, control)
-        
+
     def append(self, control):
         self.insert(len(self), control)
     def extend(self, controls):
-        for control in controls: 
+        for control in controls:
             self.append(control)
 
     def on_key_press(self, keys):
-        for control in self: 
+        for control in self:
             control.on_key_press(keys)
     def on_key_release(self, keys):
-        for control in self: 
+        for control in self:
             control.on_key_release(keys)
-    
+
     def __getattr__(self, k):
         # Yields the property with the given name, or
         # yields the child control with the given id.
-        if k in self.__dict__: 
+        if k in self.__dict__:
             return self.__dict__[k]
         ctrl = nested(self, k)
         if ctrl is not None:
@@ -1098,15 +1176,15 @@ class Layout(Layer):
         """
         self.width  = max(control.width  for control in self)
         self.height = max(control.height for control in self)
-        
+
     def __repr__(self):
         return "Layout(type=%s)" % repr(self.__class__.__name__.lower())
-    
+
     # Debug mode:
     #def draw(self):
     #    rect(0, 0, self.width, self.height, fill=None, stroke=(0,0.5,1,1))
 
-#--- Layout: Labeled ----------------------------------------------------------------------------------
+# -- Layout: Labeled ----------------------------------------------------------
 
 class Labeled(Layout):
 
@@ -1123,25 +1201,27 @@ class Labeled(Layout):
             Each control will be drawn in a new row.
         """
         self.controls.insert(i, control)
-        self.captions.insert(i, Label(caption.upper(), 
-            fontsize = theme["fontsize"] * 0.8, 
+        self.captions.insert(i, Label(caption.upper(),
+            fontsize = theme["fontsize"] * 0.8,
                 fill = theme["text"].rgb+(theme["text"].a * 0.8,)))
         Layout.insert(self, i, self.controls[i])
         Layout.insert(self, i, self.captions[i])
-        
+
     def append(self, control, caption=""):
         self.insert(len(self)/2, control, caption)
+
     def extend(self, controls):
         for control in controls:
             caption, control = isinstance(control, tuple) and control or ("", control)
             self.append(control, caption)
-            
+
     def remove(self, control):
         self.pop(self.controls.index(control))
+
     def pop(self, i):
         self.captions.pop(i); return self.controls.pop(i)
 
-#--- Layout: Rows ------------------------------------------------------------------------------------
+# -- Layout: Rows -------------------------------------------------------------
 
 class Rows(Labeled):
 
@@ -1182,26 +1262,31 @@ class Rows(Labeled):
             caption.y = dy + 0.5 * (control.height - caption.height) # valign center.
             control.y = dy
             dy += max(caption.height, control.height) + self.spacing
-        self.width  = w1 + max(w2, mw) + (w1>0 and self.spacing)
+        self.width  = w1 + max(w2, mw) + (w1 > 0 and self.spacing)
         self.height = dy - self.spacing
-        
+
 TOP, BOTTOM, CENTER = "top", "bottom", "center"
 
 class Row(Labeled):
 
     def __init__(self, controls=[], x=0, y=0, width=125, align=CENTER, **kwargs):
-        """ A layout where each control appears in a new column.
-            Each control has an associated text caption, displayed on top of the control.
-            The given width defines the desired width for each control.
+        """A layout where each control appears in a new column.
+
+        Each control has an associated text caption, displayed on top of the
+        control. The given width defines the desired width for each control.
+
         """
         Labeled.__init__(self, controls, x=x, y=y, **kwargs)
         self._maxwidth = width
-        self._align    = align
+        self._align = align
 
     def apply(self):
-        """ Adjusts the position and width of all the controls in the layout:
-            - each control is placed centrally below its caption, with spacing in between,
-            - the width of all Label, Button, Slider, Field controls is evened out.
+        """Adjust the position and width of all the controls in the layout.
+
+        - each control is placed centrally below its caption, with spacing in
+          between
+        - the width of all Label, Button, Slider, Field controls is evened out.
+
         """
         mw = self._maxwidth
         da = {TOP: 1.0, BOTTOM: 0.0, CENTER: 0.5}.get(self._align, 0.5)
@@ -1213,10 +1298,10 @@ class Row(Labeled):
             if isinstance(control, (Label, Button, Slider, Field)):
                 control._set_width(mw)
                 control._pack()
-            caption.x = dx + 0.5 * max(control.width - caption.width, 0) # halign center
-            control.x = dx + 0.5 * max(caption.width - control.width, 0) # halign center
-            caption.y = dy + h1 + (h2>0 and self.spacing)                 
-            control.y = dy + da * (h1 - control.height)                  # valign center
+            caption.x = dx + 0.5 * max(control.width - caption.width, 0)  # halign center
+            control.x = dx + 0.5 * max(caption.width - control.width, 0)  # halign center
+            caption.y = dy + h1 + (h2 > 0 and self.spacing)
+            control.y = dy + da * (h1 - control.height)                   # valign center
             dx += max(caption.width, control.width) + self.spacing
         self.width = dx - self.spacing
-        self.height = h1 + h2 + (h2>0 and self.spacing)
+        self.height = h1 + h2 + (h2 > 0 and self.spacing)

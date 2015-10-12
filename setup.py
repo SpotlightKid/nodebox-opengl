@@ -1,4 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import os
+
 from setuptools import setup
 from setuptools import find_packages
 
@@ -7,19 +11,22 @@ from setuptools import find_packages
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
-setup(      name = "NodeBox for OpenGL",
-         version = "1.7",
-     description = "NodeBox for OpenGL (NOGL) is a free, cross-platform library "
-                   "for generating 2D animations with Python programming code.",
-long_description = read("README.txt"),
-        keywords = "2d graphics sound physics games multimedia",
-         license = "BSD",
-          author = "Tom De Smedt",
-             url = "http://www.cityinabottle.org/nodebox/",
-        packages = find_packages(),
+setup(
+    name = "NodeBoxOpenGL",
+    version = "1.8pre1",
+    description = "NodeBox for OpenGL (NOGL) is a free, cross-platform "
+                  "library for generating 2D animations with Python "
+                  "programming code.",
+    long_description = read("README.txt"),
+    keywords = "2d graphics sound physics games multimedia",
+    license = "BSD",
+    author = "Tom De Smedt",
+    maintainer = "Christopher Arndt",
+    url = "https://github.com/SpotlightKid/nodebox-opengl",
+    packages = find_packages(),
     package_data = {"nodebox.gui": ["theme/*"]},
-install_requires = ["pyglet",],
-     classifiers = [
+    install_requires = ["pyglet"],
+    classifiers = [
         "Development Status :: 4 - Beta",
         "Environment :: MacOS X",
         "Environment :: Win32 (MS Windows)",
@@ -36,5 +43,5 @@ install_requires = ["pyglet",],
         "Topic :: Multimedia :: Graphics",
         "Topic :: Scientific/Engineering :: Visualization",
         "Topic :: Software Development :: Libraries :: Python Modules",
-    ],
+    ]
 )
