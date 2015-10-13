@@ -2809,13 +2809,6 @@ class Profiler:
         if isinstance(update, FunctionType):
             self.canvas.set_method(update, name="update")
 
-        # If enabled, turn Psyco off.
-        psyco_stopped = False
-        try:
-            psyco.stop()
-            psyco_stopped = True
-        except:
-            pass
         # Set the current canvas and the number of frames to profile.
         # The profiler will then repeatedly execute canvas._update() and
         # canvas._draw().
@@ -2832,9 +2825,6 @@ class Profiler:
         p.stream.close()
         s = open("_profile").read()
         remove("_profile")
-        # Restart Psyco if we stopped it.
-        if psyco_stopped:
-            psyco.profile()
         return s
 
 
