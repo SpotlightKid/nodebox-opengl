@@ -4,6 +4,9 @@
 
 from __future__ import absolute_import
 
+from math import floor
+from random import uniform
+
 from pyglet.gl import *
 
 from . import geometry
@@ -409,9 +412,9 @@ def analog(clr, angle=20, d=0.1):
 
     """
     h, s, b = rgb_to_hsb(*clr[:3])
-    h, s, b = rotate_ryb(h, s, b, angle=random(-angle, angle))
-    s *= 1 - random(-d, d)
-    b *= 1 - random(-d, d)
+    h, s, b = rotate_ryb(h, s, b, angle=randint(int(-angle), int(angle)))
+    s *= 1 - uniform(-d, d)
+    b *= 1 - uniform(-d, d)
     return Color(h, s, b, clr[3] if len(clr) == 4 else 1, colorspace=HSB)
 
 
