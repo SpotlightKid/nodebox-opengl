@@ -7,6 +7,8 @@ from pyglet.gl import *
 
 from .color import Color
 from .geometry import AffineTransform as Transform
+from .glext import *
+from .primitives import rect
 from .state import global_state as _g, state_mixin
 
 __all__ = (
@@ -33,12 +35,6 @@ __all__ = (
     'transform',
     'translate',
 )
-
-# Stroke styles
-STROKE_SOLID = "solid"
-STROKE_DOTTED = "dotted"
-STROKE_DASHED = "dashed"
-
 
 # -- Drawing state ------------------------------------------------------------
 
@@ -107,17 +103,6 @@ def outputmode(mode=None):
 
 def colormode(mode=None, range=1.0):
     raise NotImplementedError
-
-
-def glLineDash(style):
-    if style == STROKE_SOLID:
-        glDisable(GL_LINE_STIPPLE)
-    elif style == STROKE_DOTTED:
-        glEnable(GL_LINE_STIPPLE)
-        glLineStipple(0, 0x0101)
-    elif style == STROKE_DASHED:
-        glEnable(GL_LINE_STIPPLE)
-        glLineStipple(1, 0x000F)
 
 
 # -- Transformations ----------------------------------------------------------

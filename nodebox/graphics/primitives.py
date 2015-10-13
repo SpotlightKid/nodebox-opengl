@@ -13,7 +13,7 @@ from pyglet.gl import *
 
 from .bezier import BezierPath
 from .caching import precompile
-from .drawing import glLineDash
+from .glext import *
 from .geometry import Point
 from .state import global_state as _g, state_mixin
 

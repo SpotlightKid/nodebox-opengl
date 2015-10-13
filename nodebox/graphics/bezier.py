@@ -38,7 +38,7 @@ from pyglet.gl import *
 
 from . import geometry
 from .caching import flush, precompile
-from .drawing import glLineDash
+from .glext import glLineDash
 from .state import global_state as _g, state_mixin
 
 
