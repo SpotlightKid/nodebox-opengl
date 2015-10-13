@@ -18,11 +18,11 @@ img = Image("creature.png")
 p = Pixels(img)
 
 def draw(canvas):
-    
+
     # Since the background is a bit transparent,
     # it takes some time for the previous frame to fade away.
     background(1,0.03)
-    
+
     # Here we simply use pixels from the image as a color palette.
     for i in range(15):
         x = random(p.width)
@@ -31,9 +31,9 @@ def draw(canvas):
         clr.alpha *= 0.5
         fill(clr)
         stroke(clr)
-        strokewidth(random(5))
+        strokewidth(random(1, 5))
         r = random(5, 100)
         ellipse(random(canvas.width), random(canvas.height), r*2, r*2)
-    
+
 canvas.size = 500, 500
 canvas.run(draw)
