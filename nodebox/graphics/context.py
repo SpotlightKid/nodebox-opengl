@@ -26,7 +26,7 @@ from glob import glob
 from math import cos, sin, pi, floor
 from os import remove
 from os.path import dirname, join, normpath
-from random import shuffle, random as rnd
+from random import choice, shuffle, random as rnd
 from sys import getrefcount, stderr
 from time import time
 from types import FunctionType, MethodType
