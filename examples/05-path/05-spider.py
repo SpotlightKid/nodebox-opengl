@@ -13,8 +13,8 @@ def spider(string, x=0, y=0, radius=25, **kwargs):
     # **kwargs represents any additional optional parameters.
     # For example: spider("hello", 100, 100, font="Helvetica") =>
     # kwargs = {"font": "Helvetica"}
-    # We pass these on to the textpath() call in the function; 
-    # so the spider() function takes the same parameters as textpath: 
+    # We pass these on to the textpath() call in the function;
+    # so the spider() function takes the same parameters as textpath:
     # x, y, font, fontsize, fontweight, ...
     font(
         kwargs.get("font", "Droid Sans"),
@@ -28,20 +28,20 @@ def spider(string, x=0, y=0, radius=25, **kwargs):
         pt1 = choice(points)
         pt2 = choice(points)
         while distance(pt1.x, pt1.y, pt2.x, pt2.y) > radius:
-            pt2  = choice(points)      
-        line(pt1.x + random(-m, m), 
+            pt2  = choice(points)
+        line(pt1.x + random(-m, m),
              pt1.y + random(-m, m),
-             pt2.x + random(-m, m), 
+             pt2.x + random(-m, m),
              pt2.y + random(-m, m))
 
 # Render the function's output to an image.
 # Rendering the image beforehand is much faster than calling spider() every frame.
 stroke(0.1, 0.1, 0, 0.5)
 strokewidth(1)
-img = render(spider, 500, 150, 
-    string = "SPIDER",     
-      font = "Droid Sans", 
-  fontsize = 100, 
+img = render(spider, 600, 150,
+    string = "SPIDER",
+      font = "Droid Sans",
+  fontsize = 100,
       bold = True,
          x = 25,
          y = 25,
@@ -49,8 +49,8 @@ img = render(spider, 500, 150,
 
 def draw(canvas):
     canvas.clear()
-    translate(0, 200)
+    translate(0, 150)
     image(img)
 
-canvas.size = 500, 500
+canvas.size = 600, 400
 canvas.run(draw)
