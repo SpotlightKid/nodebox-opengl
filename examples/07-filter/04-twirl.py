@@ -1,12 +1,12 @@
 # Add the upper directory (where the nodebox module is) to the search path.
-import os, sys; sys.path.insert(0, os.path.join("..",".."))
+import os, sys; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from nodebox.graphics import *
 
-img = Image("creature.png")
+img = Image(os.path.join(os.path.dirname(__file__), "dendrite.png"))
 
 def draw(canvas):
-    
+
     # This basically does the same as the previous example (bump),
     # except that we use a twirl distortion filter.
     # Furthermore, the filter is permanently applied when the mouse is pressed.
@@ -15,11 +15,11 @@ def draw(canvas):
     global img
 
     canvas.clear()
-    
+
     dx = canvas.mouse.x / float(img.width)
     dy = canvas.mouse.y / float(img.height)
     image(twirl(img, dx, dy, angle=180, radius=0.5))
-    
+
     if canvas.mouse.pressed:
         # When the mouse is pressed, render a twirled version of the image,
         # and set it as the new source image.

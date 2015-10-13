@@ -1,17 +1,17 @@
 # Add the upper directory (where the nodebox module is) to the search path.
-import os, sys; sys.path.insert(0, os.path.join("..",".."))
+import os, sys; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from nodebox.graphics import *
 
-img = Image("dendrite.png")
+img = Image(os.path.join(os.path.dirname(__file__), "dendrite.png"))
 
 def draw(canvas):
-    
+
     #canvas.clear()
-    
+
     dx = canvas.mouse.x / float(img.width)
     dy = canvas.mouse.y / float(img.height)
-    
+
     # The idea is that the output of each filter can be passed to another filter,
     # creating a "rendering pipeline".
     # For example, the "mirror" effect is a very easy way to show off.
@@ -19,7 +19,7 @@ def draw(canvas):
     # In this case, we use the mouse position as axes.
     # By piping together many mirrors, we get an interesting kaleidoscopic effect.
     kaleidoscope = mirror(mirror(img, dx, dy), dy, dx)
-    
+
     # You may have noticed the fluid, blurry transitions between patterns.
     # This is because we are not clearing the canvas background (we are "painting").
     # Since the image gets drawn with an alpha=0.5 (50% opacity),

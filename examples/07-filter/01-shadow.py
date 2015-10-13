@@ -1,12 +1,12 @@
 # Add the upper directory (where the nodebox module is) to the search path.
-import os, sys; sys.path.insert(0, os.path.join("..",".."))
+import os, sys; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from nodebox.graphics import *
 
 # Load an image from file.
 # For performance, it's a good idea to create images once, outside the draw() loop.
 # NodeBox can then keep the image in graphics card memory so it displays faster.
-img = Image("creature.png")
+img = Image(os.path.join(os.path.dirname(__file__), "creature.png"))
 
 # A simple image effect is a drop shadow.
 # We create a grayscale version of the image with the colorize() filter,
@@ -17,13 +17,13 @@ shadow = colorize(img, color=(0,0,0,1))
 shadow = blur(shadow, amount=3, kernel=5)
 
 def draw(canvas):
-    
+
     canvas.clear()
-    
+
     # Some simple mouse interaction to make it more interesting.
     # Moving the mouse up will move the creature up from the ground.
     dy = canvas.mouse.y
-    
+
     # The origin point (0,0) of the canvas is in the lower left corner.
     # Transformations such as rotate() and scale() originate from (0,0).
     # We move (or "translate") the origin point to the center of the canvas,

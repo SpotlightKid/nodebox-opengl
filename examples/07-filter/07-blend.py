@@ -1,5 +1,5 @@
 # Add the upper directory (where the nodebox module is) to the search path.
-import os, sys; sys.path.insert(0, os.path.join("..",".."))
+import os, sys; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from nodebox.graphics import *
 
@@ -11,26 +11,26 @@ from nodebox.graphics import *
 # (by blending it with a copy of itself),
 # or to obtain many creative texturing effects.
 
-img1 = Image("creature.png")
-img2 = Image("creature.png")
+img1 = Image(os.path.join(os.path.dirname(__file__), "creature.png"))
+img2 = Image(os.path.join(os.path.dirname(__file__), "creature.png"))
 
 def draw(canvas):
-    
+
     canvas.clear()
-    
+
     # Press the mouse to compare the blend to normal ("source over") mode:
     if not canvas.mouse.pressed:
-        image( 
+        image(
             # Try changing this to another blend filter:
-            multiply(img1, img2, 
+            multiply(img1, img2,
             # All blend modes (and mask()) have optional dx and dy parameters
             # that define the offset of the blend layer.
-                dx = canvas.mouse.x - img1.width/2, 
+                dx = canvas.mouse.x - img1.width/2,
                 dy = canvas.mouse.y - img1.height/2))
     else:
         image(img1)
-        image(img2, 
-            x = canvas.mouse.x - img1.width/2, 
+        image(img2,
+            x = canvas.mouse.x - img1.width/2,
             y = canvas.mouse.y - img1.height/2)
 
 # Start the application:
