@@ -7,16 +7,16 @@ from nodebox.graphics import *
 # Typically, an image can be a JPEG or TIFF file, or a PNG if it uses transparency.
 # Image filenames can be passed to the image() command directly,
 # but it is faster to load them before the animation starts:
-img = Image("creature.png")
+img = Image(os.path.join(os.path.dirname(__file__), "creature.png"))
 
 def draw(canvas):
-    
+
     canvas.clear()
-    
+
     # Just like line(), rect(), ellipse() etc. images can be transformed
     # with translate(), scale() and rotate().
     translate(250, 250)
-    scale(1.0 + 0.5 * cos(canvas.frame*0.01))    
+    scale(1.0 + 0.5 * cos(canvas.frame*0.01))
     rotate(canvas.frame)
 
     # An image is drawn from its bottom-left corner.
@@ -27,6 +27,6 @@ def draw(canvas):
     # We draw it at an offset (minus half the image width and half the image height)
     # so it appears to be rotating from its center.
     image(img, x=-img.width/2, y=-img.height/2)
-    
+
 canvas.size = 500, 500
 canvas.run(draw)

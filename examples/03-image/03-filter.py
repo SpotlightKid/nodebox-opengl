@@ -23,14 +23,14 @@ from nodebox.graphics import *
 # In short, these variants are usually meant for testing purposes,
 # but it's useful to note their existence nonetheless.
 
-img = Image("creature.png")
+img = Image(os.path.join(os.path.dirname(__file__), "creature.png"))
 
 def draw(canvas):
-    
+
     canvas.clear()
 
     image(img, 50, 50, filter=distorted(STRETCH, dx=canvas.mouse.relative_x,
                                                  dy=canvas.mouse.relative_y))
-        
+
 canvas.size = 500, 500
 canvas.run(draw)
