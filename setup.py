@@ -24,7 +24,9 @@ setup(
     maintainer = "Christopher Arndt",
     url = "https://github.com/SpotlightKid/nodebox-opengl",
     packages = find_packages(),
-    package_data = {"nodebox.gui": ["theme/*"]},
+    package_data = {
+        "nodebox.gui": ["theme/*"],
+        "nodebox": ['font/*.p', 'font/*.ttf']},
     install_requires = ["pyglet"],
     classifiers = [
         "Development Status :: 4 - Beta",
