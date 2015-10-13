@@ -13,7 +13,7 @@ def read(fname):
 
 setup(
     name = "NodeBoxOpenGL",
-    version = "1.8pre1",
+    version = "1.8a1",
     description = "NodeBox for OpenGL (NOGL) is a free, cross-platform "
                   "library for generating 2D animations with Python "
                   "programming code.",
