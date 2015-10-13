@@ -62,7 +62,7 @@ EQUIDISTANT = "equidistant"
 # Drag pt1.ctrl2, pt2.ctrl1 or both simultaneously?
 IN, OUT, BOTH = "in", "out", "both"
 
-class BezierEditor:
+class BezierEditor(object):
 
     def __init__(self, path):
         self.path = path
@@ -193,7 +193,7 @@ def directed(points):
 
 # -- CLIPPING PATH ------------------------------------------------------------
 
-class ClippingMask:
+class ClippingMask(object):
     def draw(self, fill=(0,0,0,1), stroke=None):
         pass
 
@@ -1332,13 +1332,14 @@ class Layer(list, Prototype, EventHandler):
         return layer
 
     def __getattr__(self, key):
-        """ Returns the given property, or the layer with the given name.
-        """
+        """Return the given property, or the layer with the given name."""
         if key in self.__dict__:
             return self.__dict__[key]
+
         for layer in self:
             if layer.name == key:
                 return layer
+
         raise AttributeError("%s instance has no attribute '%s'" % (self.__class__.__name__, key))
 
     def _set_container(self, key, value):
@@ -1401,62 +1402,63 @@ class Layer(list, Prototype, EventHandler):
     def x(self):
         return self._x.get()
 
+    @x.setter
+    def x(self, val):
+        self._transform_cache = None
+        self._x.set(val, self.duration)
+
     @property
     def y(self):
         return self._y.get()
 
-    @property
-    def width(self):
+    @y.setter
+    def y(self, val):
+        self._transform_cache = None
+        self._y.set(val, self.duration)
+
+    def _get_width(self):
         return self._width.get()
 
-    @property
-    def height(self):
+    def _set_width(self, val):
+        self._transform_cache = None
+        self._width.set(val, self.duration)
+
+    width = property(_get_width, _set_width)
+
+    def _get_height(self):
         return self._height.get()
+
+    def _set_height(self, val):
+        self._transform_cache = None
+        self._height.set(val, self.duration)
+
+    height = property(_get_height, _set_height)
 
     @property
     def scale(self):
         return self._scale.get()
+
+    @scale.setter
+    def scale(self, val):
+        self._transform_cache = None
+        self._scale.set(val, self.duration)
+
     @property
     def rotation(self):
         return self._rotation.get()
+
+    @rotation.setter
+    def rotation(self, val):
+        self._transform_cache = None
+        self._rotation.set(val, self.duration)
 
     @property
     def opacity(self):
         return self._opacity.get()
 
-    @x.setter
-    def x(self, x):
-        self._transform_cache = None
-        self._x.set(x, self.duration)
-
-    @y.setter
-    def y(self, y):
-        self._transform_cache = None
-        self._y.set(y, self.duration)
-
-    @width.setter
-    def width(self, width):
-        self._transform_cache = None
-        self._width.set(width, self.duration)
-
-    @height.setter
-    def height(self, height):
-        self._transform_cache = None
-        self._height.set(height, self.duration)
-
-    @scale.setter
-    def scale(self, scale):
-        self._transform_cache = None
-        self._scale.set(scale, self.duration)
-
-    @rotation.setter
-    def rotation(self, rotation):
-        self._transform_cache = None
-        self._rotation.set(rotation, self.duration)
-
     @opacity.setter
-    def opacity(self, opacity):
-        self._opacity.set(opacity, self.duration)
+    def opacity(self, val):
+        self._opacity.set(val, self.duration)
 
     @property
     def xy(self):
@@ -2774,7 +2776,7 @@ def profile_run():
         _profile_canvas._draw()
 
 
-class Profiler:
+class Profiler(object):
     """Executes a number of frames of animation under a the Python profiler.
 
     Returns a string with performance statistics

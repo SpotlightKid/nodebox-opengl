@@ -22,7 +22,7 @@ from nodebox.graphics import (
     Layer, Color, Image, image, crop,
     Text, NORMAL, BOLD, DEFAULT_FONT, install_font,
     translate, rotate, lighter,
-    line, DASHED, DOTTED,
+    line, STROKE_DASHED, STROKE_DOTTED,
     DEFAULT, HAND, TEXT,
     LEFT, RIGHT, UP, DOWN, TAB, ENTER, BACKSPACE, DELETE, CTRL, SHIFT, ALT)
 
@@ -177,9 +177,12 @@ class Control(Layer):
         # yields the child control with the given id.
         if k in self.__dict__:
             return self.__dict__[k]
+
         ctrl = nested(self, k)
+
         if ctrl is not None:
             return ctrl
+
         raise AttributeError("'%s' object has no attribute '%s'" %
                              (self.__class__.__name__, k))
 
@@ -189,6 +192,7 @@ class Control(Layer):
             repr(self.id),
             hasattr(self, "value") and ", value="+repr(self.value) or ""
         )
+
 
 def nested(control, id):
     """Return the child Control with the given id, or None.
@@ -203,21 +207,27 @@ def nested(control, id):
         ctrl = control._controls[id]
         if ctrl.id == id:
             return ctrl
+
         del control._controls[id]
+
     # Nothing in the cache.
     # Traverse all child Control and Layout objects.
     m = None
     for ctrl in control:
         if ctrl.__dict__.get("id") == id:
             m = ctrl; break
+
         if isinstance(ctrl, Layout):
             m = nested(ctrl, id)
             if m is not None:
                 break
+
     # If a control was found, cache it.
     if m is not None:
         control._controls[id] = m
+
     return m
+
 
 # =============================================================================
 
@@ -260,8 +270,8 @@ class Label(Control):
         return self._text.text
 
     @caption.setter
-    def caption(self, string):
-        self._text.text = string
+    def caption(self, text):
+        self._text.text = text
         self._pack()
 
     @property
@@ -283,6 +293,7 @@ class Label(Control):
 
     def draw(self):
         self._text.draw()
+
 
 # =============================================================================
 
@@ -661,14 +672,14 @@ class Editable(Control):
     def value(self):
         # IncrementalTextLayout in Pyglet 1.1.4 has a bug with empty strings.
         # We keep track of empty strings with Editable._empty to avoid this.
-        return u"" if self.empty else self._editor.document.text
+        return u"" if self._empty else self._editor.document.text
 
     @value.setter
     def value(self, string):
         self._editor.begin_update()
         self._editor.document.text = string or " "
         self._editor.end_update()
-        self._empty = string == "" and True or False
+        self._empty = string == ""
 
     @property
     def editing(self):
@@ -1307,7 +1318,7 @@ class Labeled(Layout):
     def extend(self, controls):
         for control in controls:
             if isinstance(control, tuple):
-                self.append(*control)
+                self.append(control[1], control[0])
             else:
                 self.append(control, "")
 
