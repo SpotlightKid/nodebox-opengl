@@ -5,7 +5,7 @@ from nodebox.graphics import *
 
 # The classic NodeBox for Mac OS X has interesting path mathematics functionality.
 # This functionality is also present in NodeBox for OpenGL.
-# For example: we can calculate arbitrary points on a path, 
+# For example: we can calculate arbitrary points on a path,
 # insert new points, construct a smooth BezierPath from a list of points, etc.
 
 # What we want to do in this example,
@@ -24,13 +24,13 @@ stem.moveto(150, 100)
 stem.curveto(50, 400, 450, 400, 350, 100)
 
 def draw(canvas):
-    
+
     canvas.clear()
 
     nofill()
     stroke(0, 0.25)
     strokewidth(1)
-    
+
     drawpath(stem)
 
     fill(0.25, 0.15, 0.75, 0.25)
@@ -49,9 +49,9 @@ def draw(canvas):
         rotate(angle)         # Rotate in the point's direction (you may need to add 90, 180, ...)
         drawpath(leaf)        # Draw the leaf.
         rotate(90)            # Indicate the normal (i.e. the line perpendicular to the tangent)
-        line(0, 0, 300, 0, strokestyle=DASHED)
+        line(0, 0, 300, 0, strokestyle=STROKE_DASHED)
         pop()                 # Reset origin point, scale and rotation.
-            
+
 canvas.size = 500, 500
 canvas.run(draw)
 
