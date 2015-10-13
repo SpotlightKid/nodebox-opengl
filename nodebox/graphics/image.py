@@ -15,6 +15,7 @@ from pyglet.gl import *
 
 from .caching import *
 from .color import Color
+from .state import global_state as _g
 
 __all__ = (
     'image',
@@ -346,9 +347,7 @@ class Image(object):
         glPushMatrix()
         glTranslatef(x, y, 0)
         glScalef(w, h, 0)
-        # XXX: We do not have access to the global _alpha here
-        # This seems to equal 1 anyway when it matters
-        #glColor4f(color[0], color[1], color[2], color[3] * _alpha)
+        glColor4f(color[0], color[1], color[2], color[3] * _g.alpha)
         glColor4f(color[0], color[1], color[2], color[3])
         glCallList(self._cache)
         glPopMatrix()
@@ -496,7 +495,7 @@ class Pixels(list):
         Users need to wrap the list in a Color themselves for performance.
 
         - r,g,b,a = Pixels[i]
-        - clr = color(Pixels[i], base=255)
+        - clr = Color(Pixels[i], base=255)
 
         """
         return self.array[i*4:i*4+4]
@@ -535,12 +534,12 @@ class Pixels(list):
     def get(self, i, j):
         """Returns the pixel at row i, column j as a Color object."""
         if 0 <= i < self.width and 0 <= j < self.height:
-            return color(self[i+j*self.width], base=255)
+            return Color(self[i + j * self.width], base=255)
 
     def set(self, i, j, clr):
         """Sets the pixel at row i, column j from a Color object."""
         if 0 <= i < self.width and 0 <= j < self.height:
-            self[i+j*self.width] = clr.map(base=255)
+            self[i + j * self.width] = clr.map(base=255)
 
     def update(self):
         """Pixels.update() must be called to refresh the image."""

@@ -11,6 +11,8 @@
 
 # Debugging must be switched on or off before other modules are imported.
 
+from __future__ import absolute_import, print_function
+
 import pyglet
 pyglet.options['debug_gl'] = False
 
@@ -22,20 +24,24 @@ except ImportError:
 from datetime import datetime
 from glob import glob
 from math import cos, sin, pi, floor
-from os import path, remove
+from os import remove
+from os.path import dirname, join, normpath
 from random import shuffle, random as rnd
-from sys import getrefcount
+from sys import getrefcount, stderr
 from time import time
 from types import FunctionType, MethodType
 
 from pyglet.gl import *  # noqa
 
 from . import geometry
-from .bezierpath import *  # noqa
+from .bezier import *  # noqa
 from .caching import *  # noqa
 from .color import *  # noqa
+from .drawing import *  # noqa
 from .image import *  # noqa
+from .primitives import *  # noqa
 from .shader import *  # noqa
+from .state import global_state as _g, state_mixin
 
 
 try:
@@ -44,456 +50,11 @@ try:
 except NameError:
     integer_types = (int,)
 
-#import bezier
-# Do this at the end, when we have defined BezierPath,
-# which is needed in the bezier module.
-
-#import shader
-# Do this when we have defined texture() and image(),
-# which are needed in the shader module.
-
 # OpenGL version, e.g. "2.0 NVIDIA-1.5.48".
 OPENGL = pyglet.gl.gl_info.get_version()
 
-# Constants for transformations
-CORNER = "corner"
-CENTER = "center"
-
-# Stroke styles
-SOLID = "solid"
-DOTTED = "dotted"
-DASHED = "dashed"
-
-# Font weight
-NORMAL = "normal"
-BOLD = "bold"
-ITALIC = "italic"
-
-# Text alignment
-LEFT = "left"
-RIGHT = "right"
-CENTER = "center"
-
-
-# -- Drawing state ------------------------------------------------------------
-
-# globals to keep drawing state
-_background = None    # Current state background color.
-_fill = None    # Current state fill color.
-_stroke = None    # Current state stroke color.
-_strokewidth = 1       # Current state strokewidth.
-_strokestyle = "solid" # Current state strokestyle.
-_alpha = 1       # Current state alpha transparency.
-
-
-color = Color
-
-
-def background(*args, **kwargs):
-    """Set the current background color."""
-    global _background
-
-    if args:
-        _background = Color(*args, **kwargs)
-        xywh = (GLint*4)(); glGetIntegerv(GL_VIEWPORT, xywh); x,y,w,h = xywh
-        rect(x, y, w, h, fill=_background, stroke=None)
-
-    return _background
-
-
-def fill(*args, **kwargs):
-    """Set the current fill color for drawing primitives and paths."""
-    global _fill
-
-    if args:
-        _fill = Color(*args, **kwargs)
-
-    return _fill
-
-fill(0) # The default fill is black.
-
-
-def stroke(*args, **kwargs):
-    """Set the current stroke color."""
-    global _stroke
-
-    if args:
-        _stroke = Color(*args, **kwargs)
-
-    return _stroke
-
-
-def nofill():
-    """No current fill color."""
-    global _fill
-    _fill = None
-
-
-def nostroke():
-    """No current stroke color."""
-    global _stroke
-    _stroke = None
-
-
-def strokewidth(width=None):
-    """Set the outline stroke width."""
-    # Note: strokewidth is clamped to integers (e.g. 0.2 => 1),
-    # but finer lines can be achieved visually with a transparent stroke.
-    # Thicker strokewidth results in ugly (i.e. no) line caps.
-    global _strokewidth
-
-    if width is not None:
-        _strokewidth = width
-        glLineWidth(width)
-
-    return _strokewidth
-
-
-def strokestyle(style=None):
-    """Set the outline stroke style (SOLID / DOTTED / DASHED)."""
-    global _strokestyle
-
-    if style is not None and style != _strokestyle:
-        _strokestyle = style
-        glLineDash(style)
-
-    return _strokestyle
-
-
-def glLineDash(style):
-    if style == SOLID:
-        glDisable(GL_LINE_STIPPLE)
-    elif style == DOTTED:
-        glEnable(GL_LINE_STIPPLE)
-        glLineStipple(0, 0x0101)
-    elif style == DASHED:
-        glEnable(GL_LINE_STIPPLE)
-        glLineStipple(1, 0x000F)
-
-
-def outputmode(mode=None):
-    raise NotImplementedError
-
-
-def colormode(mode=None, range=1.0):
-    raise NotImplementedError
-
-
-# -- COLOR MIXIN --------------------------------------------------------------
-# Drawing commands like rect() have optional parameters fill and stroke to set
-# the color directly.
-
-def color_mixin(**kwargs):
-    fill = kwargs.get("fill", _fill)
-    stroke = kwargs.get("stroke", _stroke)
-    strokewidth = kwargs.get("strokewidth", _strokewidth)
-    strokestyle = kwargs.get("strokestyle", _strokestyle)
-    return (fill, stroke, strokewidth, strokestyle)
-
-
-# =============================================================================
-
-# -- TRANSFORMATIONS ----------------------------------------------------------
-# Unlike NodeBox, all transformations are CORNER-mode and originate from the
-# bottom-left corner.
-
-# Example: using Transform to get a transformed path:
-#
-#     t = Transform()
-#     t.rotate(45)
-#     p = BezierPath()
-#     p.rect(10, 10, 100, 70)
-#     p = t.transform_path(p)
-#     p.contains(x, y) # check if the mouse is in the transformed shape.
-Transform = geometry.AffineTransform
-
-
-def push():
-    """Push the transformation state.
-
-    Subsequent transformations (translate, rotate, scale) remain in effect
-    until pop() is called.
-
-    """
-    glPushMatrix()
-
-
-def pop():
-    """Pop the transformation state.
-
-    This reverts the transformation to before the last push().
-
-    """
-    glPopMatrix()
-
-
-def translate(x, y, z=0):
-    """Translate coordinate system origin.
-
-    By default, the origin of the layer or canvas is at the bottom left.
-
-    This origin point will be moved by (x,y) pixels.
-
-    """
-    glTranslatef(round(x), round(y), round(z))
-
-
-def rotate(degrees, axis=(0,0,1)):
-    """Rotate the transformation state.
-
-    This has the effect that all subsequent drawing primitives are rotated.
-
-    Rotations work incrementally: calling rotate(60) and rotate(30) sets the
-    current rotation to 90.
-
-    """
-    glRotatef(degrees, *axis)
-
-
-def scale(x, y=None, z=None):
-    """Scale the transformation state."""
-    if y is None:
-        y = x
-    if z is None:
-        z = 1
-    glScalef(x, y, z)
-
-
-def reset():
-    """Reset the transform state of the layer or canvas."""
-    glLoadIdentity()
-
-
-def transform(mode=None):
-    if mode == CENTER:
-        raise NotImplementedError("no center-mode transform")
-    return CORNER
-
-
-def skew(x, y):
-    raise NotImplementedError
-
-
-# =============================================================================
-
-# -- DRAWING PRIMITIVES -------------------------------------------------------
-# Drawing primitives: Point, line, rect, ellipse, arrow. star.
-# The fill and stroke are two different shapes put on top of each other.
-
-Point = geometry.Point
-
-def line(x0, y0, x1, y1, **kwargs):
-    """Draw a straight line from x0, y0 to x1, y1.
-
-    The current stroke and strokewidth are applied.
-
-    """
-    fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
-    if stroke is not None and strokewidth > 0:
-        glColor4f(stroke[0], stroke[1], stroke[2], stroke[3] * _alpha)
-        glLineWidth(strokewidth)
-        if strokestyle != _strokestyle:
-            glLineDash(strokestyle)
-        glBegin(GL_LINES)
-        glVertex2f(x0, y0)
-        glVertex2f(x1, y1)
-        glEnd()
-
-def rect(x, y, width, height, **kwargs):
-    """Draw a rectangle with the bottom left corner at x, y.
-
-    The current stroke, strokewidth and fill color are applied.
-
-    """
-    fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
-
-    if fill is not None:
-        glColor4f(fill[0], fill[1], fill[2], fill[3] * _alpha)
-        glRectf(x, y, x+width, y+width)
-
-    if stroke is not None and strokewidth > 0:
-        glLineWidth(strokewidth)
-        glLineDash(strokestyle)
-        glColor4f(stroke[0], stroke[1], stroke[2], stroke[3] * _alpha)
-        # Note: this performs equally well as when using precompile().
-        glBegin(GL_LINE_LOOP)
-        glVertex2f(x, y)
-        glVertex2f(x+width, y)
-        glVertex2f(x+width, y+height)
-        glVertex2f(x, y+height)
-        glEnd()
-
-
-def triangle(x1, y1, x2, y2, x3, y3, **kwargs):
-    """Draw the triangle created by connecting the three given points.
-
-    The current stroke, strokewidth and fill color are applied.
-
-    """
-    fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
-    for i, clr in enumerate((fill, stroke)):
-        if clr is not None and (i==0 or strokewidth > 0):
-            if i == 1:
-                glLineWidth(strokewidth)
-                if strokestyle != _strokestyle:
-                    glLineDash(strokestyle)
-            glColor4f(clr[0], clr[1], clr[2], clr[3] * _alpha)
-            # Note: this performs equally well as when using precompile().
-            glBegin((GL_TRIANGLES, GL_LINE_LOOP)[i])
-            glVertex2f(x1, y1)
-            glVertex2f(x2, y2)
-            glVertex2f(x3, y3)
-            glEnd()
-
-
-_ellipses = {}
-ELLIPSE_SEGMENTS = 50
-
-def ellipse(x, y, width, height, segments=ELLIPSE_SEGMENTS, **kwargs):
-    """Draw an ellipse with the center located at x, y.
-
-    The current stroke, strokewidth and fill color are applied.
-
-    """
-    if not segments in _ellipses:
-        # For the given amount of line segments, calculate the ellipse once.
-        # Then reuse the cached ellipse by scaling it to the desired size.
-        commands = []
-        f = 2 * pi / segments
-        v = [(cos(t)/2, sin(t)/2)
-             for t in [i*f for i in list(range(segments)) + [0]]]
-
-        for mode in (GL_TRIANGLE_FAN, GL_LINE_LOOP):
-            commands.append(precompile(lambda:(
-               glBegin(mode),
-               [glVertex2f(x, y) for (x, y) in v],
-               glEnd()
-               )))
-
-        _ellipses[segments] = commands
-
-    fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
-
-    for i, clr in enumerate((fill, stroke)):
-        if clr is not None and (i==0 or strokewidth > 0):
-            if i == 1:
-                glLineWidth(strokewidth)
-
-                if strokestyle != _strokestyle:
-                    glLineDash(strokestyle)
-
-            glColor4f(clr[0], clr[1], clr[2], clr[3] * _alpha)
-            glPushMatrix()
-            glTranslatef(x, y, 0)
-            glScalef(width, height, 1)
-            glCallList(_ellipses[segments][i])
-            glPopMatrix()
-
-
-oval = ellipse # Backwards compatibility.
-
-
-def arrow(x, y, width, **kwargs):
-    """Draw an arrow with its tip located at x, y.
-
-    The current stroke, strokewidth and fill color are applied.
-
-    """
-    head = width * 0.4
-    tail = width * 0.2
-    fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
-    for i, clr in enumerate((fill, stroke)):
-        if clr is not None and (i==0 or strokewidth > 0):
-            if i == 1:
-                glLineWidth(strokewidth)
-                glLineDash(strokestyle)
-            glColor4f(clr[0], clr[1], clr[2], clr[3] * _alpha)
-            # Note: this performs equally well as when using precompile().
-            glBegin((GL_POLYGON, GL_LINE_LOOP)[i])
-            glVertex2f(x, y)
-            glVertex2f(x-head, y+head)
-            glVertex2f(x-head, y+tail)
-            glVertex2f(x-width, y+tail)
-            glVertex2f(x-width, y-tail)
-            glVertex2f(x-head, y-tail)
-            glVertex2f(x-head, y-head)
-            glVertex2f(x, y)
-            glEnd()
-
-
-def gcd(a, b):
-    """Return greatest common divider of a and b."""
-    return gcd(b, a % b) if b else a
-
-
-_stars = {} #TODO: LRU?
-def fast_star(x, y, points=20, outer=100, inner=50, **kwargs):
-    """Draw a star with the given points, outer radius and inner radius.
-
-    The current stroke, strokewidth and fill color are applied.
-
-    """
-    scale = gcd(inner, outer)
-    iscale = inner / scale
-    oscale = outer / scale
-    cached = _stars.get((points, iscale, oscale), [])
-
-    if not cached:
-        radii = [oscale, iscale] * int(points+1); radii.pop() # which radius?
-        f = pi / points
-        v = [(r*sin(i*f), r*cos(i*f)) for i, r in enumerate(radii)]
-        cached.append(precompile(lambda:(
-            glBegin(GL_TRIANGLE_FAN),
-            glVertex2f(0, 0),
-            [glVertex2f(vx, vy) for (vx, vy) in v],
-            glEnd()
-        )))
-        cached.append(precompile(lambda:(
-            glBegin(GL_LINE_LOOP),
-            [glVertex2f(vx, vy) for (vx, vy) in v],
-            glEnd()
-        )))
-        _stars[(points, iscale, oscale)] = cached
-
-    fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
-    for i, clr in enumerate((fill, stroke)):
-        if clr is not None and (i == 0 or strokewidth > 0):
-            if i == 1:
-                glLineWidth(strokewidth)
-                if strokestyle != _strokestyle:
-                    glLineDash(strokestyle)
-            glColor4f(clr[0], clr[1], clr[2], clr[3] * _alpha)
-            glPushMatrix()
-            glTranslatef(x, y, 0)
-            glScalef(scale, scale, 1)
-            glCallList(cached[i])
-            glPopMatrix()
-
-
-def star(x, y, points=20, outer=100, inner=50, **kwargs):
-    """Draw a star with the given points, outer radius and inner radius.
-
-    The current stroke, strokewidth and fill color are applied.
-
-    This is about 20x slower than fast_star; use it only if you need the path
-    returned.
-
-    """
-    p = BezierPath(**kwargs)
-    p.moveto(x, y+outer)
-
-    for i in range(0, int(2*points)+1):
-        r = (outer, inner)[i%2]
-        a = pi*i/points
-        p.lineto(x+r*sin(a), y+r*cos(a))
-
-    p.closepath()
-
-    if kwargs.get("draw", True):
-        p.draw(**kwargs)
-
-    return p
-
+# The default fill is black.
+fill(0)
 
 # -- BEZIER EDITOR ------------------------------------------------------------
 
@@ -537,9 +98,9 @@ class BezierEditor:
         """Scales the point control handles by the given factor."""
         pt1, pt2 = pt, self._nextpoint(pt)
         if handle == BOTH or handle == IN:
-            pt1.ctrl2.x, pt1.ctrl2.y = bezier.linepoint(v, pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
+            pt1.ctrl2.x, pt1.ctrl2.y = linepoint(v, pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
         if handle == BOTH or handle == OUT and pt2 is not None and pt2.cmd == CURVETO:
-            pt2.ctrl1.x, pt2.ctrl1.y = bezier.linepoint(v, pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y)
+            pt2.ctrl1.x, pt2.ctrl1.y = linepoint(v, pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y)
 
     def smooth(self, pt, mode=None, handle=BOTH):
         pt1, pt2, i = pt, self._nextpoint(pt), self.path.index(pt)
@@ -603,7 +164,7 @@ def directed(points):
             # For a point on a curve, the control handle gives the best direction.
             # For PathElement (fixed point in BezierPath), ctrl2 tells us how the curve arrives.
             # For DynamicPathElement (returnd from BezierPath.point()), ctrl1 tell how the curve arrives.
-            ctrl = isinstance(pt, bezier.DynamicPathElement) and pt.ctrl1 or pt.ctrl2
+            ctrl = isinstance(pt, DynamicPathElement) and pt.ctrl1 or pt.ctrl2
             angle = geometry.angle(ctrl.x, ctrl.y, pt.x, pt.y)
         elif 0 < i < n-1 and pt.__dict__.get("_cmd") == LINETO and p[i-1].__dict__.get("_cmd") == CURVETO:
             # For a point on a line preceded by a curve, look ahead gives better results.
@@ -616,7 +177,7 @@ def directed(points):
             # For the last point in a BezierPath, we can calculate a previous point very close by.
             pt0 = points.point(0.999)
             angle = geometry.angle(pt0.x, pt0.y, pt.x, pt.y)
-        elif i == n-1 and isinstance(pt, bezier.DynamicPathElement) and pt.ctrl1.x != pt.x or pt.ctrl1.y != pt.y:
+        elif i == n-1 and isinstance(pt, DynamicPathElement) and pt.ctrl1.x != pt.x or pt.ctrl1.y != pt.y:
             # For the last point in BezierPath.points(), use incoming handle (ctrl1) for curves.
             angle = geometry.angle(pt.ctrl1.x, pt.ctrl1.y, pt.x, pt.y)
         elif 0 < i:
@@ -751,7 +312,7 @@ class Animation(list):
         return self.loop is False and self._i == len(self)-1
 
     def draw(self, *args, **kwargs):
-        kwargs['alpha'] = kwargs.get('alpha', 1.0) * _alpha
+        kwargs['alpha'] = kwargs.get('alpha', 1.0) * _g.alpha
         if not self.done:
             image(self.frame, *args, **kwargs)
 
@@ -792,6 +353,17 @@ animation = Animation
 # =============================================================================
 
 #--- FONT ---------------------------------------------------------------------
+
+# Font weight
+NORMAL = "normal"
+BOLD = "bold"
+ITALIC = "italic"
+
+# Text alignment
+LEFT = "left"
+RIGHT = "right"
+CENTER = "center"
+
 
 def install_font(ttf):
     """Load the given TrueType font from file, and returns True on success."""
@@ -936,7 +508,7 @@ def label(str="", width=None, height=None, **kwargs):
 
     """
     fontname, fontsize, bold, italic, lineheight, align = font_mixin(**kwargs)
-    fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
+    fill, stroke, strokewidth, strokestyle = state_mixin(**kwargs)
     fill = fill is None and (0,0,0,0) or fill
     # We use begin_update() so that the TextLayout doesn't refresh on each update.
     # FormattedDocument allows individual styling of characters - see Text.style().
@@ -1015,7 +587,8 @@ class Text(object):
         elif k == "string":
             return self._label.text
         elif k == "width":
-            if self._label.width != geometry.INFINITE: return self._label.width
+            if self._label.width != geometry.INFINITE:
+                return self._label.width
         elif k in ("font", "fontname"):
             return self._label.font_name
         elif k == "fontsize":
@@ -1025,10 +598,14 @@ class Text(object):
         elif k == "lineheight":
             return self._label.get_style("line_spacing") / (self.fontsize or 1)
         elif k == "align":
-            if not self._align: self._align = self._label.get_style(k)
+            if not self._align:
+                self._align = self._label.get_style(k)
+
             return self._align
         elif k == "fill":
-            if not self._fill: self._fill = Color([ch/255.0 for ch in self._label.color])
+            if not self._fill:
+                self._fill = Color([ch/255.0 for ch in self._label.color])
+
             return self._fill
         else:
             raise AttributeError("'Text' object has no attribute '%s'" % k)
@@ -1182,7 +759,7 @@ def text(str, x=None, y=None, width=None, height=None, draw=True, **kwargs):
         # Changing Text properties is still faster than creating a new Text.
         # The cache has a limited size (200), so the oldest Text objects are deleted.
         fontname, fontsize, bold, italic, lineheight, align = font_mixin(**kwargs)
-        fill, stroke, strokewidth, strokestyle = color_mixin(**kwargs)
+        fill, stroke, strokewidth, strokestyle = state_mixin(**kwargs)
         id = (fontname, int(fontsize), bold, italic)
         recycled = False
 
@@ -1256,10 +833,10 @@ try:
     # Load cached font glyph path information from nodebox/font/glyph.p.
     # By default, it has glyph path info for Droid Sans, Droid Sans Mono,
     # Droid Serif.
-    glyphs = path.join(path.dirname(__file__), "..", "font", "glyph.p")
-    glyphs = pickle.load(open(glyphs))
-except:
-    pass
+    glyphs = normpath(join(dirname(__file__), "..", "font", "glyph.p"))
+    glyphs = pickle.load(open(glyphs, 'rb'))
+except Exception as exc:
+    print("Error reading picked font glyph metrics: %s" % exc, file=stderr)
 
 def textpath(string, x=0, y=0, **kwargs):
     """Returns a BezierPath from the given text string.
@@ -1280,7 +857,7 @@ def textpath(string, x=0, y=0, **kwargs):
     for ch in string:
         try:
             glyph = glyphs[fontname][w][ch]
-        except:
+        except KeyError:
             raise GlyphPathError("no glyph path information for %s %s '%s'" %
                                  (w, fontname, ch))
 
@@ -1308,8 +885,10 @@ def _rnd_exp(bias=0.5):
     bias = max(0, min(bias, 1)) * 10
     i = int(floor(bias))             # bias*10 => index in the _map curve.
     n = _RANDOM_MAP[i]               # If bias is 0.3, rnd()**2.33 will average 0.3.
+
     if bias < 10:
-        n += (_RANDOM_MAP[i+1]-n) * (bias-i)
+        n += (_RANDOM_MAP[i + 1] - n) * (bias - i)
+
     return n
 
 
@@ -1321,14 +900,19 @@ def random(v1=1.0, v2=None, bias=None):
     """
     if v2 is None:
         v1, v2 = 0, v1
+
     if bias is None:
         r = rnd()
     else:
-        r = rnd()**_rnd_exp(bias)
-    x = r * (v2-v1) + v1
+        r = rnd() ** _rnd_exp(bias)
+
+    x = r * (v2 - v1) + v1
+
     if isinstance(v1, int) and isinstance(v2, int):
         x = int(x)
+
     return x
+
 
 def grid(cols, rows, colwidth=1, rowheight=1, shuffled=False):
     """Yield (x,y)-tuples for the given number of rows and columns.
@@ -1813,49 +1397,66 @@ class Layer(list, Prototype, EventHandler):
         layer.__dict__["parent"] = None
         return layer
 
-    def _get_x(self):
+    @property
+    def x(self):
         return self._x.get()
-    def _get_y(self):
+
+    @property
+    def y(self):
         return self._y.get()
-    def _get_width(self):
+
+    @property
+    def width(self):
         return self._width.get()
-    def _get_height(self):
+
+    @property
+    def height(self):
         return self._height.get()
-    def _get_scale(self):
+
+    @property
+    def scale(self):
         return self._scale.get()
-    def _get_rotation(self):
+    @property
+    def rotation(self):
         return self._rotation.get()
-    def _get_opacity(self):
+
+    @property
+    def opacity(self):
         return self._opacity.get()
 
-    def _set_x(self, x):
+    @x.setter
+    def x(self, x):
         self._transform_cache = None
         self._x.set(x, self.duration)
-    def _set_y(self, y):
+
+    @y.setter
+    def y(self, y):
         self._transform_cache = None
         self._y.set(y, self.duration)
-    def _set_width(self, width):
+
+    @width.setter
+    def width(self, width):
         self._transform_cache = None
         self._width.set(width, self.duration)
-    def _set_height(self, height):
+
+    @height.setter
+    def height(self, height):
         self._transform_cache = None
         self._height.set(height, self.duration)
-    def _set_scale(self, scale):
+
+    @scale.setter
+    def scale(self, scale):
         self._transform_cache = None
         self._scale.set(scale, self.duration)
-    def _set_rotation(self, rotation):
+
+    @rotation.setter
+    def rotation(self, rotation):
         self._transform_cache = None
         self._rotation.set(rotation, self.duration)
-    def _set_opacity(self, opacity):
-        self._opacity.set(opacity, self.duration)
 
-    x = property(_get_x, _set_x)
-    y = property(_get_y, _set_y)
-    width = property(_get_width, _set_width)
-    height = property(_get_height, _set_height)
-    scaling = property(_get_scale, _set_scale)
-    rotation = property(_get_rotation, _set_rotation)
-    opacity = property(_get_opacity, _set_opacity)
+    @opacity.setter
+    def opacity(self, opacity):
+        self._opacity.set(opacity, self.duration)
 
     @property
     def xy(self):
@@ -2036,14 +1637,13 @@ class Layer(list, Prototype, EventHandler):
                 layer._draw()
 
         # Draw layer.
-        global _alpha
-        _alpha = self._opacity.current  # XXX should also affect child layers?
+        _g.alpha = self._opacity.current  # XXX should also affect child layers?
         glPushMatrix()
         # Layers are drawn relative from parent origin.
         glTranslatef(-round(dx), -round(dy), 0)
         self.draw()
         glPopMatrix()
-        _alpha = 1
+        _g.alpha = 1
 
         # Draw child layers on top.
         for layer in self:

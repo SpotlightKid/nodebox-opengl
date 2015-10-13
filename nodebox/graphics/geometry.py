@@ -5,8 +5,7 @@
 # Copyright (c) 2008-2012 City In A Bottle (cityinabottle.org)
 # http://cityinabottle.org/nodebox
 
-from math import sqrt, pow
-from math import sin, cos, atan2, degrees, radians, pi
+from math import atan2, cos, degrees, radians, pi, pow, sin, sqrt
 
 INFINITE = 1e15 # float("inf") doesn't work on windows.
 

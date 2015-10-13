@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from pyglet.gl import *
 
 from . import geometry
-
+from .state import global_state as _g
 
 __all__ = (
     'HSB',
@@ -16,6 +16,7 @@ __all__ = (
     'XYZ',
     'Color',
     'analog',
+    'color',
     'colorplane',
     'complement',
     'darker',
@@ -165,7 +166,7 @@ class Color(list):
         return Color(self)
 
     def _apply(self):
-        glColor4f(self[0], self[1], self[2], self[3] * _alpha)
+        glColor4f(self[0], self[1], self[2], self[3] * _g.alpha)
 
     def __repr__(self):
         return "Color(%.3f, %.3f, %.3f, %.3f)" % \
@@ -231,6 +232,9 @@ class Color(list):
         h, s, b = rgb_to_hsb(*self[:3])
         h, s, b = rotate_ryb(h, s, b, angle)
         return Color(h, s, b, self.a, colorspace=HSB)
+
+
+color = Color
 
 
 # -- COLOR SPACE --------------------------------------------------------------
@@ -443,13 +447,13 @@ def colorplane(x, y, width, height, *a):
     glTranslatef(x, y, 0)
     glScalef(width, height, 1)
     glBegin(GL_QUADS)
-    glColor4f(clr1[0], clr1[1], clr1[2], clr1[3] * _alpha)
+    glColor4f(clr1[0], clr1[1], clr1[2], clr1[3] * _g.alpha)
     glVertex2f(-0.0, 1.0)
-    glColor4f(clr2[0], clr2[1], clr2[2], clr2[3] * _alpha)
+    glColor4f(clr2[0], clr2[1], clr2[2], clr2[3] * _g.alpha)
     glVertex2f(1.0, 1.0)
-    glColor4f(clr3[0], clr3[1], clr3[2], clr3[3] * _alpha)
+    glColor4f(clr3[0], clr3[1], clr3[2], clr3[3] * _g.alpha)
     glVertex2f(1.0, -0.0)
-    glColor4f(clr4[0], clr4[1], clr4[2], clr4[3] * _alpha)
+    glColor4f(clr4[0], clr4[1], clr4[2], clr4[3] * _g.alpha)
     glVertex2f(-0.0, -0.0)
     glEnd()
     glPopMatrix()
