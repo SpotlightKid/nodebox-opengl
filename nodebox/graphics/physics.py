@@ -5,8 +5,6 @@
 # Copyright (c) 2008-2012 City In A Bottle (cityinabottle.org)
 # http://cityinabottle.org/nodebox
 
-# This module can benefit greatly from loading psyco.
-
 from math     import sqrt, pow
 from math     import sin, cos, atan2, degrees, radians, pi
 from random   import random
