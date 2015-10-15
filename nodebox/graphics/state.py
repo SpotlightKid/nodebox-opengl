@@ -3,6 +3,7 @@
 
 __all__ = ('State', 'global_state', 'state_mixin')
 
+
 class State(object):
     def __init__(self):
         self.alpha = 1              # alpha transparency for drawing commands
@@ -28,4 +29,3 @@ def state_mixin(**kwargs):
     strokewidth = kwargs.get("strokewidth", global_state.strokewidth)
     strokestyle = kwargs.get("strokestyle", global_state.strokestyle)
     return (fill, stroke, strokewidth, strokestyle)
-

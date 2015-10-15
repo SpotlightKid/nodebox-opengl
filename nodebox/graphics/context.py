@@ -548,12 +548,14 @@ class Text(object):
 
         """
         if width is None:
-            # Supplying a string with "\n" characters will crash if no width is given.
-            # On the outside it appears as None but inside we use a very large number.
+            # Supplying a string with "\n" characters will crash if no width is
+            # given. On the outside it appears as None but inside we use a very
+            # large number.
             width = geometry.INFINITE
             a, kwargs["align"] = kwargs.get("align", _align), LEFT
         else:
             a = None
+
         self.__dict__["x"] = x
         self.__dict__["y"] = y
         self.__dict__["_label"] = label(str, width, height, **kwargs)
@@ -635,10 +637,10 @@ class Text(object):
             self._label.set_style("line_spacing", v * (self.fontsize or 1))
         elif k == "align":
             self._align = v
-            self._label.set_style(k, self._label.width == geometry.INFINITE and LEFT or v)
+            self._label.set_style(k, LEFT if self._label.width == geometry.INFINITE else v)
         elif k == "fill":
             self._fill = v
-            self._label.color = [int(255*ch) for ch in self._fill or (0,0,0,0)]
+            self._label.color = [int(255 * ch) for ch in self._fill or (0, 0, 0, 0)]
         else:
             raise AttributeError("'Text' object has no attribute '%s'" % k)
 
