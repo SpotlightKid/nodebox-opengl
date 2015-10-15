@@ -36,7 +36,7 @@ from math import acos, ceil, sin, cos, hypot, pow, sqrt, radians, degrees
 
 from pyglet.gl import *
 
-from . import geometry
+from . import geometry as geo
 from .caching import flush, precompile
 from .glext import glLineDash
 from .state import global_state as _g, state_mixin
@@ -47,9 +47,10 @@ __all__ = (
     'LINETO',
     'CURVETO',
     'CLOSE',
-    'RELATIVE',
     'RELATIVE_PRECISION',
+    'BezierEditor',
     'BezierPath',
+    'ClippingMask',
     'DynamicPathElement',
     'NoCurrentPath',
     'NoCurrentPointForPath',
@@ -60,12 +61,15 @@ __all__ = (
     'arc',
     'arcto',
     'autoclosepath',
+    'beginclip',
     'beginpath',
     'closepath',
     'contours',
     'curvepoint',
     'curveto',
+    'directed',
     'drawpath',
+    'endclip'
     'endpath',
     'findpath',
     'insert_point',
@@ -78,14 +82,23 @@ __all__ = (
     'segment_lengths'
 )
 
-MOVETO  = "moveto"
-LINETO  = "lineto"
-CURVETO = "curveto"
-CLOSE   = "close"
 
-RELATIVE = "relative"
+# PathElement point format
+MOVETO = "moveto"
+LINETO = "lineto"
+CURVETO = "curveto"
+CLOSE = "close"
+
+
 # Number of straight lines to represent a curve = 20% of curve length.
 RELATIVE_PRECISION = 0.2
+
+# BezierEditor
+EQUIDISTANT = "equidistant"
+# Drag pt1.ctrl2, pt2.ctrl1 or both simultaneously?
+IN = "in"
+OUT = "out"
+BOTH = "both"
 
 
 class PathError(Exception):
@@ -185,7 +198,7 @@ def endpath(draw=True, **kwargs):
     return p
 
 
-class PathPoint(geometry.Point):
+class PathPoint(geo.Point):
     """A control handle for PathElement."""
 
     def __init__(self, x=0, y=0):
@@ -235,7 +248,7 @@ class PathElement(object):
         elif cmd == CURVETO:
             pt, h1, h2 = pts[2], pts[0], pts[1]
         else:
-            pt, h1, h2 = (0,0), (0,0), (0,0)
+            pt, h1, h2 = (0, 0), (0, 0), (0, 0)
 
         self._cmd = cmd
         self._x = pt[0]
@@ -263,6 +276,7 @@ class PathElement(object):
     @property
     def x(self):
         return self._x
+
     @x.setter
     def x(self, v):
         self._x = v
@@ -452,7 +466,7 @@ class BezierPath(list):
 
         """
         x0, y0 = self[-1].x, self[-1].y
-        phi = geometry.angle(x0, y0, x, y)
+        phi = geo.angle(x0, y0, x, y)
 
         for p in arcto(x0, y0, radius, radius, phi, short, not clockwise, x, y):
             f = len(p) == 2 and self.lineto or self.curveto
@@ -533,23 +547,20 @@ class BezierPath(list):
             self._index[pt] = i
             e.smooth(pt, *args, **kwargs)
 
-    def flatten(self, precision=RELATIVE):
-        """Return a list of contours, in which each contour is a list of (x,y)-tuples.
+    def flatten(self, precision=RELATIVE_PRECISION):
+        """Return a list of contours, where each is a list of (x,y)-tuples.
 
         The precision determines the number of straight lines to use as a
         substition for a curve. It can be a fixed number (int) or relative to
-        the curve length (float or RELATIVE).
+        the curve length (float or RELATIVE_PRECISION).
 
         """
-        if precision == RELATIVE:
-            precision = RELATIVE_PRECISION
-
         contours = [[]]
-        x0, y0 = None, None
+        x0 = y0 = None
         closeto = None
 
         for pt in self:
-            if (pt.cmd == LINETO or pt.cmd == CURVETO) and x0 == y0 is None:
+            if pt.cmd in (LINETO, CURVETO) and x0 is None and y0 is None:
                 raise NoCurrentPointForPath
             elif pt.cmd == LINETO:
                 contours[-1].append((x0, y0))
@@ -588,16 +599,17 @@ class BezierPath(list):
 
         return contours
 
-    def draw(self, precision=RELATIVE, **kwargs):
+    def draw(self, precision=RELATIVE_PRECISION, **kwargs):
         """Draw the path.
 
         The precision determines the number of straight lines to use as a
         substition for a curve. It can be a fixed number (int) or relative to
-        the curve length (float or RELATIVE).
+        the curve length (float or RELATIVE_PRECISION).
 
         """
         if len(kwargs) > 0:
-            # Optional parameters in draw() overrule those set during initialization.
+            # Optional parameters in draw() overrule those set during
+            # initialization.
             kw = dict(self._kwargs)
             kw.update(kwargs)
             fill, stroke, strokewidth, strokestyle = state_mixin(**kw)
@@ -607,7 +619,7 @@ class BezierPath(list):
         def _draw_fill(contours):
             # Drawing commands for the path fill
             # (as triangles by tessellating the contours).
-            v = geometry.tesselate(contours)
+            v = geo.tesselate(contours)
             glBegin(GL_TRIANGLES)
 
             for x, y in v:
@@ -661,7 +673,7 @@ class BezierPath(list):
         """Return the directional angle at time t (0.0-1.0) on the path."""
         # The directed() enumerator is much faster but less precise.
         pt0, pt1 = (self.point(t), self.point(t+0.001)) if t == 0 else (self.point(t-0.001), self.point(t))
-        return geometry.angle(pt0.x, pt0.y, pt1.x, pt1.y)
+        return geo.angle(pt0.x, pt0.y, pt1.x, pt1.y)
 
     def point(self, t):
         """Return the PathElement at time t (0.0-1.0) on the path.
@@ -736,7 +748,7 @@ class BezierPath(list):
             if self._polygon is None or self._polygon[1] != precision:
                 self._polygon = [(pt.x,pt.y) for pt in self.points(precision)], precision
             # Ray casting algorithm:
-            return geometry.point_in_polygon(self._polygon[0], x, y)
+            return geo.point_in_polygon(self._polygon[0], x, y)
 
         return False
 
@@ -954,7 +966,7 @@ def _locate(path, t, segments=None):
 
     for i, el in enumerate(path):
         if i == 0 or el.cmd == MOVETO:
-            closeto = geometry.Point(el.x, el.y)
+            closeto = geo.Point(el.x, el.y)
 
         if t <= segments[i] or i == len(segments)-1:
             break
@@ -1083,7 +1095,7 @@ def findpath(points, curvature=1.0):
 
     for i, pt in enumerate(points):
         if isinstance(pt, tuple):
-            points[i] = geometry.Point(pt[0], pt[1])
+            points[i] = geo.Point(pt[0], pt[1])
 
     # No points: return nothing.
     if len(points) == 0: return None
@@ -1151,7 +1163,7 @@ def findpath(points, curvature=1.0):
     return path
 
 
-#--- BEZIER PATH INSERT POINT -------------------------------------------------
+# -- BEZIER PATH INSERT POINT -------------------------------------------------
 
 def insert_point(path, t):
     """Inserts an extra point at t."""
@@ -1184,13 +1196,13 @@ def insert_point(path, t):
         path[i+1].ctrl1.y = pt_c2y
         path[i+1].ctrl2.x = pt_h2x
         path[i+1].ctrl2.y = pt_h2y
-        path.insert(i+1, PathElement(cmd=CURVETO, pts=[(pt_h1x, pt_h1y), (pt_c1x, pt_c1y), (pt_x, pt_y)]))
+        path.insert(i + 1, PathElement(cmd=CURVETO, pts=[(pt_h1x, pt_h1y), (pt_c1x, pt_c1y), (pt_x, pt_y)]))
     elif pt_cmd == LINETO:
-        path.insert(i+1, PathElement(cmd=LINETO, pts=[(pt_x, pt_y)]))
+        path.insert(i + 1, PathElement(cmd=LINETO, pts=[(pt_x, pt_y)]))
     else:
         raise PathError("Didn't expect pt_cmd %s here" % pt_cmd)
 
-    return path[i+1]
+    return path[i + 1]
 
     #new_path = BezierPath(None)
     #new_path.moveto(path[0].x, path[0].y)
@@ -1222,15 +1234,15 @@ def insert_point(path, t):
     return new_path
 
 
-#==============================================================================
+# =============================================================================
 
-#--- BEZIER ARC ---------------------------------------------------------------
+# -- BEZIER ARC ---------------------------------------------------------------
 
 # Copyright (c) 2005-2008, Enthought, Inc.
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without modification,
-# are permitted provided that the following conditions are met:
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
 #
 # Redistributions of source code must retain the above copyright notice,
 # this list of conditions and the following disclaimer.
@@ -1243,13 +1255,15 @@ def insert_point(path, t):
 #
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-# IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 def arc(x1, y1, x2, y2, angle=0, extent=90):
     """Compute a cubic Bezier approximation of an elliptical arc.
@@ -1268,7 +1282,7 @@ def arc(x1, y1, x2, y2, angle=0, extent=90):
     their respective Bezier control points.
 
     """
-    x1, y1, x2, y2 = min(x1,x2), max(y1,y2), max(x1,x2), min(y1,y2)
+    x1, y1, x2, y2 = min(x1, x2), max(y1, y2), max(x1, x2), min(y1, y2)
     extent = min(max(extent, -360), 360)
     n = abs(extent) <= 90 and 1 or int(ceil(abs(extent) / 90.0))
     a = float(extent) / n
@@ -1280,8 +1294,8 @@ def arc(x1, y1, x2, y2, angle=0, extent=90):
     kappa = abs(4.0 / 3 * (1 - cos(a2)) / sin(a2))
     points = []
     for i in range(n):
-        theta0 = radians(angle + (i+0) * a)
-        theta1 = radians(angle + (i+1) * a)
+        theta0 = radians(angle + (i + 0) * a)
+        theta1 = radians(angle + (i + 1) * a)
         c0, c1 = cos(theta0), cos(theta1)
         s0, s1 = sin(theta0), sin(theta1)
         k = a > 0 and -kappa or kappa
@@ -1306,8 +1320,9 @@ def arcto(x1, y1, rx, ry, phi, large_arc, sweep, x2, y2):
 
     """
     def angle(x1, y1, x2, y2):
-        a = degrees(acos(min(max((x1*x2 + y1*y2) / hypot(x1,y1) * hypot(x2,y2), -1), 1)))
-        return x1*y2 > y1*x2 and a or -a
+        a = degrees(acos(min(max((x1 * x2 + y1 * y2) / hypot(x1, y1) *
+                                 hypot(x2, y2), -1), 1)))
+        return x1 * y2 > y1 * x2 and a or -a
 
     def abspt(x, y, cphi, sphi, mx, my):
         return (x * cp - y * sp + mx,
@@ -1315,8 +1330,10 @@ def arcto(x1, y1, rx, ry, phi, large_arc, sweep, x2, y2):
 
     if x1 == x2 and y1 == y2:
         return []
-    if rx == 0 or ry == 0: # Line segment.
-        return [(x2,y2)]
+
+    if rx == 0 or ry == 0:  # Line segment.
+        return [(x2, y2)]
+
     rx, ry, phi = abs(rx), abs(ry), phi % 360
     cp = cos(radians(phi))
     sp = sin(radians(phi))
@@ -1324,21 +1341,23 @@ def arcto(x1, y1, rx, ry, phi, large_arc, sweep, x2, y2):
     # Rotate to the local coordinates.
     dx = 0.5 * (x1 - x2)
     dy = 0.5 * (y1 - y2)
-    x  =  cp * dx + sp * dy
-    y  = -sp * dx + cp * dy
+    x = cp * dx + sp * dy
+    y = -sp * dx + cp * dy
 
-    # If rx, ry and phi are such that there is no solution
-    # (basically, the ellipse is not big enough to reach from (x1, y1) to (x2, y2))
-    # then the ellipse is scaled up uniformly until there is exactly one solution
+    # If rx, ry and phi are such that there is no solution (basically, the
+    # ellipse is not big enough to reach from (x1, y1) to (x2, y2)) then the
+    # ellipse is scaled up uniformly until there is exactly one solution
     # (until the ellipse is just big enough).
-    s = (x/rx)**2 + (y/ry)**2
+    s = (x / rx) ** 2 + (y / ry) ** 2
     if s > 1.0:
-        s = sqrt(s); rx, ry = rx*s, ry*s
+        s = sqrt(s)
+        rx, ry = rx * s, ry * s
 
     # Solve for the center in the local coordinates.
-    a = sqrt(max((rx*ry)**2 - (rx*y)**2 - (ry*x)**2, 0) / ((rx*y)**2 + (ry*x)**2))
+    a = sqrt(max((rx * ry) ** 2 - (rx * y) ** 2 - (ry * x) ** 2, 0) /
+             ((rx * y) ** 2 + (ry * x) ** 2))
     a = large_arc == sweep and -a or a
-    cx =  a * rx * y / ry
+    cx = a * rx * y / ry
     cy = -a * ry * x / rx
 
     # Transform back.
@@ -1347,22 +1366,218 @@ def arcto(x1, y1, rx, ry, phi, large_arc, sweep, x2, y2):
 
     # Compute the start angle and the angular extent of the arc.
     # Note that theta is local to the phi-rotated coordinate space.
-    dx1 = ( x - cx) / rx
-    dy1 = ( y - cy) / ry
+    dx1 = (x - cx) / rx
+    dy1 = (y - cy) / ry
     dx2 = (-x - cx) / rx
     dy2 = (-y - cy) / ry
     theta = angle(1.0, 0.0, dx1, dy1)
     delta = angle(dx1, dy1, dx2, dy2)
-    if not sweep and delta > 0: delta -= 360
-    if sweep and delta < 0: delta += 360
+
+    if not sweep and delta > 0:
+        delta -= 360
+
+    if sweep and delta < 0:
+        delta += 360
 
     # Break it apart into Bezier curves.
-    points  = []
-    handles = arc(cx-rx, cy-ry, cx+rx, cy+ry, theta, delta)
+    points = []
+    handles = arc(cx - rx, cy - ry, cx + rx, cy + ry, theta, delta)
+
     for x1, y1, x2, y2, x3, y3, x4, y4 in handles:
         points.append((
-            abspt(x2, y2, cp, sp, mx, my) + \
-            abspt(x3, y3, cp, sp, mx, my) + \
+            abspt(x2, y2, cp, sp, mx, my) +
+            abspt(x3, y3, cp, sp, mx, my) +
             abspt(x4, y4, cp, sp, mx, my)
         ))
+
     return points
+
+
+# -- BEZIER EDITOR ------------------------------------------------------------
+
+class BezierEditor(object):
+
+    def __init__(self, path):
+        self.path = path
+
+    def _nextpoint(self, pt):
+        i = self.path.index(pt)  # BezierPath caches this operation.
+        return i < len(self.path) - 1 and self.path[i + 1] or None
+
+    def translate(self, pt, x=0, y=0, h1=(0, 0), h2=(0, 0)):
+        """Translate the point and its control handles by (x,y).
+
+        Translates the incoming handle by h1 and the outgoing handle by h2.
+
+        """
+        pt1, pt2 = pt, self._nextpoint(pt)
+        pt1.x += x
+        pt1.y += y
+        pt1.ctrl2.x += x + h1[0]
+        pt1.ctrl2.y += y + h1[1]
+
+        if pt2 is not None:
+            pt2.ctrl1.x += x + (pt2.cmd == CURVETO and h2[0] or 0)
+            pt2.ctrl1.y += y + (pt2.cmd == CURVETO and h2[1] or 0)
+
+    def rotate(self, pt, angle, handle=BOTH):
+        """Rotate the point control handles by the given angle."""
+        pt1, pt2 = pt, self._nextpoint(pt)
+
+        if handle in (BOTH, IN):
+            pt1.ctrl2.x, pt1.ctrl2.y = geo.rotate(pt1.ctrl2.x,
+                pt1.ctrl2.y, pt1.x, pt1.y, angle)
+
+        if handle in (BOTH, OUT) and pt2 is not None and pt2.cmd == CURVETO:
+            pt2.ctrl1.x, pt2.ctrl1.y = geo.rotate(pt2.ctrl1.x,
+                pt2.ctrl1.y, pt1.x, pt1.y, angle)
+
+    def scale(self, pt, v, handle=BOTH):
+        """Scale the point control handles by the given factor."""
+        pt1, pt2 = pt, self._nextpoint(pt)
+
+        if handle in (BOTH, IN):
+            pt1.ctrl2.x, pt1.ctrl2.y = linepoint(v, pt1.x, pt1.y, pt1.ctrl2.x,
+                                                 pt1.ctrl2.y)
+
+        if handle in (BOTH, OUT) and pt2 is not None and pt2.cmd == CURVETO:
+            pt2.ctrl1.x, pt2.ctrl1.y = linepoint(v, pt1.x, pt1.y, pt2.ctrl1.x,
+                                                 pt2.ctrl1.y)
+
+    def smooth(self, pt, mode=None, handle=BOTH):
+        pt1, pt2, i = pt, self._nextpoint(pt), self.path.index(pt)
+
+        if pt2 is None:
+            return
+
+        if pt1.cmd == pt2.cmd == CURVETO:
+            if mode == EQUIDISTANT:
+                d1 = d2 = 0.5 * (
+                    geo.distance(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y) +
+                    geo.distance(pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y))
+            else:
+                d1 = geo.distance(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
+                d2 = geo.distance(pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y)
+
+            if handle == IN:
+                a = geo.angle(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
+            elif handle == OUT:
+                a = geo.angle(pt2.ctrl1.x, pt2.ctrl1.y, pt1.x, pt1.y)
+            elif handle == BOTH:
+                a = geo.angle(pt2.ctrl1.x, pt2.ctrl1.y, pt1.ctrl2.x, pt1.ctrl2.y)
+
+            pt1.ctrl2.x, pt1.ctrl2.y = geo.coordinates(pt1.x, pt1.y, d1, a)
+            pt2.ctrl1.x, pt2.ctrl1.y = geo.coordinates(pt1.x, pt1.y, d2, a - 180)
+        elif pt1.cmd == CURVETO and pt2.cmd == LINETO:
+            d = mode == (geo.distance(pt1.x, pt1.y, pt2.x, pt2.y)
+                if EQUIDISTANT else
+                geo.distance(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y))
+            a = geo.angle(pt1.x, pt1.y, pt2.x, pt2.y)
+            pt1.ctrl2.x, pt1.ctrl2.y = geo.coordinates(pt1.x, pt1.y, d, a - 180)
+        elif pt1.cmd == LINETO and pt2.cmd == CURVETO and i > 0:
+            d = mode == (geo.distance(pt1.x, pt1.y, self.path[i - 1].x,
+                                      self.path[i - 1].y)
+                         if EQUIDISTANT else
+                         geo.distance(pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y))
+            a = geo.angle(self.path[i - 1].x, self.path[i - 1].y, pt1.x, pt1.y)
+            pt2.ctrl1.x, pt2.ctrl1.y = geo.coordinates(pt1.x, pt1.y, d, a)
+
+
+# -- POINT ANGLES -------------------------------------------------------------
+
+def directed(points):
+    """Return iterator yielding (angle, point)-tuples for given list of points.
+
+    The angle represents the direction of the point on the path. This works
+    with BezierPath, Bezierpath.points, [pt1, pt2, pt2, ...]
+
+    For example:
+        for a, pt in directed(path.points(30)):
+            push()
+            translate(pt.x, pt.y)
+            rotate(a)
+            arrow(0, 0, 10)
+            pop()
+
+    This is useful if you want to have shapes following a path. To put text on
+    a path, rotate the angle by +-90 to get the normal (i.e. perpendicular).
+
+    """
+    p = list(points)
+    n = len(p)
+
+    for i, pt in enumerate(p):
+        if 0 < i < n - 1 and pt.__dict__.get("_cmd") == CURVETO:
+            # For a point on a curve, the control handle gives the best
+            # direction.
+            # For PathElement (fixed point in BezierPath), ctrl2 tells us how
+            # the curve arrives.
+            # For DynamicPathElement (returnd from BezierPath.point()), ctrl1
+            # tells how the curve arrives.
+            ctrl = isinstance(pt, DynamicPathElement) and pt.ctrl1 or pt.ctrl2
+            angle = geo.angle(ctrl.x, ctrl.y, pt.x, pt.y)
+        elif (0 < i < n - 1 and pt.__dict__.get("_cmd") == LINETO
+                and p[i - 1].__dict__.get("_cmd") == CURVETO):
+            # For a point on a line preceded by a curve, look ahead gives
+            # better results.
+            angle = geo.angle(pt.x, pt.y, p[i + 1].x, p[i + 1].y)
+        elif i == 0 and isinstance(points, BezierPath):
+            # For the first point in a BezierPath, we can calculate a next
+            # point very close by.
+            pt1 = points.point(0.001)
+            angle = geo.angle(pt.x, pt.y, pt1.x, pt1.y)
+        elif i == n - 1 and isinstance(points, BezierPath):
+            # For the last point in a BezierPath, we can calculate a previous
+            # point very close by.
+            pt0 = points.point(0.999)
+            angle = geo.angle(pt0.x, pt0.y, pt.x, pt.y)
+        elif (i == n - 1 and isinstance(pt, DynamicPathElement)
+                and pt.ctrl1.x != pt.x or pt.ctrl1.y != pt.y):
+            # For the last point in BezierPath.points(), use incoming handle
+            # (ctrl1) for curves.
+            angle = geo.angle(pt.ctrl1.x, pt.ctrl1.y, pt.x, pt.y)
+        elif 0 < i:
+            # For any point, look back gives a good result, if enough points
+            # are given.
+            angle = geo.angle(p[i - 1].x, p[i - 1].y, pt.x, pt.y)
+        elif i < n - 1:
+            # For the first point, the best (only) guess is the location of the
+            # next point.
+            angle = geo.angle(pt.x, pt.y, p[i + 1].x, p[i + 1].y)
+        else:
+            angle = 0
+
+        yield angle, pt
+
+
+# -- CLIPPING PATH ------------------------------------------------------------
+
+class ClippingMask(object):
+    def draw(self, fill=(0, 0, 0, 1), stroke=None):
+        pass
+
+
+def beginclip(path):
+    """Enable the given BezierPath (or ClippingMask) as a clipping mask.
+
+    Drawing commands between beginclip() and endclip() are constrained to the
+    shape of the path.
+
+    """
+    # Enable the stencil buffer to limit the area of rendering (stenciling).
+    glClear(GL_STENCIL_BUFFER_BIT)
+    glEnable(GL_STENCIL_TEST)
+    glStencilFunc(GL_NOTEQUAL, 0, 0)
+    glStencilOp(GL_INCR, GL_INCR, GL_INCR)
+    # Shouldn't depth testing be disabled when stencilling?
+    # In any case, if it is, transparency doesn't work.
+    #glDisable(GL_DEPTH_TEST)
+    # Disregard color settings; always use a black mask.
+    path.draw(fill=(0, 0, 0, 1), stroke=None)
+    #glEnable(GL_DEPTH_TEST)
+    glStencilFunc(GL_EQUAL, 1, 1)
+    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP)
+
+
+def endclip():
+    glDisable(GL_STENCIL_TEST)

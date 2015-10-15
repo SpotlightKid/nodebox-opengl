@@ -1165,6 +1165,40 @@ class Distortion(Filter):
 
 # =============================================================================
 
+# -- OFFSCREEN RENDERING ------------------------------------------------------
+# Offscreen buffers can be used to render images from paths etc.
+# or to apply filters on images before drawing them to the screen.
+# There are several ways to draw offscreen:
+#
+# - Apply a given filter to an image and return the resulting image:
+#
+#     filter(img, filter):
+#
+# - Excute the drawing commands in function and return teh resulting image:
+#
+#     render(function, width, height):
+#
+# - Create your own subclass of OffscreenBuffer with a draw() method:
+#
+#     class MyBuffer(OffscreenBuffer):
+#         def draw(self): pass
+#
+# - Define drawing commands between OffscreenBuffer.push() and pop():
+#
+#     b = MyBuffer()
+#     b.push()
+#     # drawing commands
+#     b.pop()
+#     img = Image(b.render())
+#
+# This module already defines several filters that use an offscreen buffer,
+# for example:
+#
+# blur(), adjust(), multiply(), twirl(), ...
+#
+# The less you change about an offscreen buffer, the faster it runs.
+# This includes switching it on and off and changing its size.
+
 # -- FRAME BUFFER OBJECT ------------------------------------------------------
 # Based on "Frame Buffer Object 101" (2006), Rob Jones,
 # http://www.gamedev.net/reference/articles/article2331.asp

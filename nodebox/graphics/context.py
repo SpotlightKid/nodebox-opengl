@@ -56,202 +56,6 @@ OPENGL = pyglet.gl.gl_info.get_version()
 # The default fill is black.
 fill(0)
 
-# -- BEZIER EDITOR ------------------------------------------------------------
-
-EQUIDISTANT = "equidistant"
-# Drag pt1.ctrl2, pt2.ctrl1 or both simultaneously?
-IN, OUT, BOTH = "in", "out", "both"
-
-class BezierEditor(object):
-
-    def __init__(self, path):
-        self.path = path
-
-    def _nextpoint(self, pt):
-        i = self.path.index(pt) # BezierPath caches this operation.
-        return i < len(self.path)-1 and self.path[i+1] or None
-
-    def translate(self, pt, x=0, y=0, h1=(0,0), h2=(0,0)):
-        """Translates the point and its control handles by (x,y).
-
-        Translates the incoming handle by h1 and the outgoing handle by h2.
-
-        """
-        pt1, pt2 = pt, self._nextpoint(pt)
-        pt1.x += x
-        pt1.y += y
-        pt1.ctrl2.x += x + h1[0]
-        pt1.ctrl2.y += y + h1[1]
-        if pt2 is not None:
-            pt2.ctrl1.x += x + (pt2.cmd == CURVETO and h2[0] or 0)
-            pt2.ctrl1.y += y + (pt2.cmd == CURVETO and h2[1] or 0)
-
-    def rotate(self, pt, angle, handle=BOTH):
-        """Rotates the point control handles by the given angle."""
-        pt1, pt2 = pt, self._nextpoint(pt)
-        if handle == BOTH or handle == IN:
-            pt1.ctrl2.x, pt1.ctrl2.y = geometry.rotate(pt1.ctrl2.x, pt1.ctrl2.y, pt1.x, pt1.y, angle)
-        if handle == BOTH or handle == OUT and pt2 is not None and pt2.cmd == CURVETO:
-            pt2.ctrl1.x, pt2.ctrl1.y = geometry.rotate(pt2.ctrl1.x, pt2.ctrl1.y, pt1.x, pt1.y, angle)
-
-    def scale(self, pt, v, handle=BOTH):
-        """Scales the point control handles by the given factor."""
-        pt1, pt2 = pt, self._nextpoint(pt)
-        if handle == BOTH or handle == IN:
-            pt1.ctrl2.x, pt1.ctrl2.y = linepoint(v, pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
-        if handle == BOTH or handle == OUT and pt2 is not None and pt2.cmd == CURVETO:
-            pt2.ctrl1.x, pt2.ctrl1.y = linepoint(v, pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y)
-
-    def smooth(self, pt, mode=None, handle=BOTH):
-        pt1, pt2, i = pt, self._nextpoint(pt), self.path.index(pt)
-        if pt2 is None:
-            return
-        if pt1.cmd == pt2.cmd == CURVETO:
-            if mode == EQUIDISTANT:
-                d1 = d2 = 0.5 * (
-                     geometry.distance(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y) + \
-                     geometry.distance(pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y))
-            else:
-                d1 = geometry.distance(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
-                d2 = geometry.distance(pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y)
-            if handle == IN:
-                a = geometry.angle(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
-            if handle == OUT:
-                a = geometry.angle(pt2.ctrl1.x, pt2.ctrl1.y, pt1.x, pt1.y)
-            if handle == BOTH:
-                a = geometry.angle(pt2.ctrl1.x, pt2.ctrl1.y, pt1.ctrl2.x, pt1.ctrl2.y)
-            pt1.ctrl2.x, pt1.ctrl2.y = geometry.coordinates(pt1.x, pt1.y, d1, a)
-            pt2.ctrl1.x, pt2.ctrl1.y = geometry.coordinates(pt1.x, pt1.y, d2, a-180)
-        elif pt1.cmd == CURVETO and pt2.cmd == LINETO:
-            d = mode == EQUIDISTANT and \
-                geometry.distance(pt1.x, pt1.y, pt2.x, pt2.y) or \
-                geometry.distance(pt1.x, pt1.y, pt1.ctrl2.x, pt1.ctrl2.y)
-            a = geometry.angle(pt1.x, pt1.y, pt2.x, pt2.y)
-            pt1.ctrl2.x, pt1.ctrl2.y = geometry.coordinates(pt1.x, pt1.y, d, a-180)
-        elif pt1.cmd == LINETO and pt2.cmd == CURVETO and i > 0:
-            d = mode == EQUIDISTANT and \
-                geometry.distance(pt1.x, pt1.y, self.path[i-1].x, self.path[i-1].y) or \
-                geometry.distance(pt1.x, pt1.y, pt2.ctrl1.x, pt2.ctrl1.y)
-            a = geometry.angle(self.path[i-1].x, self.path[i-1].y, pt1.x, pt1.y)
-            pt2.ctrl1.x, pt2.ctrl1.y = geometry.coordinates(pt1.x, pt1.y, d, a)
-
-
-# -- POINT ANGLES -------------------------------------------------------------
-
-def directed(points):
-    """Return iterator yielding (angle, point)-tuples for given list of points.
-
-    The angle represents the direction of the point on the path. This works
-    with BezierPath, Bezierpath.points, [pt1, pt2, pt2, ...]
-
-    For example:
-        for a, pt in directed(path.points(30)):
-            push()
-            translate(pt.x, pt.y)
-            rotate(a)
-            arrow(0, 0, 10)
-            pop()
-
-    This is useful if you want to have shapes following a path. To put text on
-    a path, rotate the angle by +-90 to get the normal (i.e. perpendicular).
-
-    """
-    p = list(points)
-    n = len(p)
-
-    for i, pt in enumerate(p):
-        if 0 < i < n-1 and pt.__dict__.get("_cmd") == CURVETO:
-            # For a point on a curve, the control handle gives the best direction.
-            # For PathElement (fixed point in BezierPath), ctrl2 tells us how the curve arrives.
-            # For DynamicPathElement (returnd from BezierPath.point()), ctrl1 tell how the curve arrives.
-            ctrl = isinstance(pt, DynamicPathElement) and pt.ctrl1 or pt.ctrl2
-            angle = geometry.angle(ctrl.x, ctrl.y, pt.x, pt.y)
-        elif 0 < i < n-1 and pt.__dict__.get("_cmd") == LINETO and p[i-1].__dict__.get("_cmd") == CURVETO:
-            # For a point on a line preceded by a curve, look ahead gives better results.
-            angle = geometry.angle(pt.x, pt.y, p[i+1].x, p[i+1].y)
-        elif i == 0 and isinstance(points, BezierPath):
-            # For the first point in a BezierPath, we can calculate a next point very close by.
-            pt1 = points.point(0.001)
-            angle = geometry.angle(pt.x, pt.y, pt1.x, pt1.y)
-        elif i == n-1 and isinstance(points, BezierPath):
-            # For the last point in a BezierPath, we can calculate a previous point very close by.
-            pt0 = points.point(0.999)
-            angle = geometry.angle(pt0.x, pt0.y, pt.x, pt.y)
-        elif i == n-1 and isinstance(pt, DynamicPathElement) and pt.ctrl1.x != pt.x or pt.ctrl1.y != pt.y:
-            # For the last point in BezierPath.points(), use incoming handle (ctrl1) for curves.
-            angle = geometry.angle(pt.ctrl1.x, pt.ctrl1.y, pt.x, pt.y)
-        elif 0 < i:
-            # For any point, look back gives a good result, if enough points are given.
-            angle = geometry.angle(p[i-1].x, p[i-1].y, pt.x, pt.y)
-        elif i < n-1:
-            # For the first point, the best (only) guess is the location of the next point.
-            angle = geometry.angle(pt.x, pt.y, p[i+1].x, p[i+1].y)
-        else:
-            angle = 0
-        yield angle, pt
-
-
-# -- CLIPPING PATH ------------------------------------------------------------
-
-class ClippingMask(object):
-    def draw(self, fill=(0,0,0,1), stroke=None):
-        pass
-
-
-def beginclip(path):
-    """Enable the given BezierPath (or ClippingMask) as a clipping mask.
-
-    Drawing commands between beginclip() and endclip() are constrained to the
-    shape of the path.
-
-    """
-    # Enable the stencil buffer to limit the area of rendering (stenciling).
-    glClear(GL_STENCIL_BUFFER_BIT)
-    glEnable(GL_STENCIL_TEST)
-    glStencilFunc(GL_NOTEQUAL, 0, 0)
-    glStencilOp(GL_INCR, GL_INCR, GL_INCR)
-    # Shouldn't depth testing be disabled when stencilling?
-    # In any case, if it is, transparency doesn't work.
-    #glDisable(GL_DEPTH_TEST)
-    path.draw(fill=(0,0,0,1), stroke=None) # Disregard color settings; always use a black mask.
-    #glEnable(GL_DEPTH_TEST)
-    glStencilFunc(GL_EQUAL, 1, 1)
-    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP)
-
-def endclip():
-    glDisable(GL_STENCIL_TEST)
-
-
-# -- SUPERSHAPE ---------------------------------------------------------------
-
-def supershape(x, y, width, height, m, n1, n2, n3, points=100, percentage=1.0,
-               range_=2*pi, **kwargs):
-    """Return a BezierPath constructed using the superformula.
-
-    This formula can be used to describe many complex shapes and curves that
-    are found in nature.
-
-    """
-    path = BezierPath()
-    first = True
-
-    for i in range(points):
-        if i <= points * percentage:
-            dx, dy = geometry.superformula(m, n1, n2, n3, i * range_ / points)
-            dx, dy = dx*width/2 + x, dy*height/2 + y
-
-            if first is True:
-                path.moveto(dx, dy); first=False
-            else:
-                path.lineto(dx, dy)
-
-    path.closepath()
-
-    if kwargs.get("draw", True):
-        path.draw(**kwargs)
-
-    return path
-
 
 #--- ANIMATION ----------------------------------------------------------------
 # A sequence of images displayed in a loop.
@@ -323,32 +127,6 @@ class Animation(list):
 
 
 animation = Animation
-
-
-#--- OFFSCREEN RENDERING ------------------------------------------------------
-# Offscreen buffers can be used to render images from paths etc.
-# or to apply filters on images before drawing them to the screen.
-# There are several ways to draw offscreen:
-#
-# - render(img, filter): applies the given filter to the image and returns it.
-# - procedural(function, width, height): execute the drawing commands in
-#   function inside an image.
-# - Create your own subclass of OffscreenBuffer with a draw() method:
-#   class MyBuffer(OffscreenBuffer):
-#       def draw(self): pass
-# - Define drawing commands between OffscreenBuffer.push() and pop():
-#   b = MyBuffer()
-#   b.push()
-#   # drawing commands
-#   b.pop()
-#   img = Image(b.render())
-#
-# The shader.py module already defines several filters that use an offscreen
-# buffer, for example:
-# blur(), adjust(), multiply(), twirl(), ...
-#
-# The less you change about an offscreen buffer, the faster it runs.
-# This includes switching it on and off and changing its size.
 
 
 # =============================================================================
@@ -2795,7 +2573,6 @@ class Canvas(list, Prototype, EventHandler):
 
 # -- PROFILER -----------------------------------------------------------------
 
-
 CUMULATIVE = "cumulative"
 SLOWEST = "slowest"
 
@@ -2864,6 +2641,7 @@ class Profiler(object):
 
 
 # -- LIBRARIES ----------------------------------------------------------------
+
 def ximport(library):
     """Import the library and assign it a _ctx variable containing the
     current context.

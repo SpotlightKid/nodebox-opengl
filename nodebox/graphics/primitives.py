@@ -14,7 +14,7 @@ from pyglet.gl import *
 from .bezier import BezierPath
 from .caching import precompile
 from .glext import *
-from .geometry import Point
+from .geometry import Point, superformula
 from .state import global_state as _g, state_mixin
 
 
@@ -26,6 +26,7 @@ __all__ = (
     'line',
     'rect',
     'star',
+    'supershape',
     'triangle'
 )
 
@@ -252,3 +253,35 @@ def star(x, y, points=20, outer=100, inner=50, **kwargs):
         p.draw(**kwargs)
 
     return p
+
+
+# -- SUPERSHAPE ---------------------------------------------------------------
+
+def supershape(x, y, width, height, m, n1, n2, n3, points=100, percentage=1.0,
+               range_=2 * pi, **kwargs):
+    """Return a BezierPath constructed using the superformula.
+
+    This formula can be used to describe many complex shapes and curves that
+    are found in nature.
+
+    """
+    path = BezierPath()
+    first = True
+
+    for i in range(points):
+        if i <= points * percentage:
+            dx, dy = superformula(m, n1, n2, n3, i * range_ / points)
+            dx, dy = dx * width / 2 + x, dy * height / 2 + y
+
+            if first is True:
+                path.moveto(dx, dy)
+                first = False
+            else:
+                path.lineto(dx, dy)
+
+    path.closepath()
+
+    if kwargs.get("draw", True):
+        path.draw(**kwargs)
+
+    return path
