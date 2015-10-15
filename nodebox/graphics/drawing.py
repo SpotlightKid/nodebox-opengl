@@ -44,8 +44,7 @@ def background(*args, **kwargs):
         _g.background = Color(*args, **kwargs)
         xywh = (GLint * 4)()
         glGetIntegerv(GL_VIEWPORT, xywh)
-        x, y, w, h = xywh
-        rect(x, y, w, h, fill=_g.background, stroke=None)
+        rect(*xywh, fill=_g.background, stroke=None)
 
     return _g.background
 

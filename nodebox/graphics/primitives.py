@@ -61,7 +61,7 @@ def rect(x, y, width, height, **kwargs):
 
     if fill is not None:
         glColor4f(fill[0], fill[1], fill[2], fill[3] * _g.alpha)
-        glRectf(x, y, x + width, y + width)
+        glRectf(x, y, x + width, y + height)
 
     if stroke is not None and strokewidth > 0:
         glLineWidth(strokewidth)
