@@ -2508,6 +2508,9 @@ class Canvas(list, Prototype, EventHandler):
         if keys.code == "p" and CTRL in keys.modifiers:
             self.paused = not self.paused
 
+        if keys.code == 'f11':
+            self.fullscreen = not self.fullscreen
+
         if keys.code == "s" and CTRL in keys.modifiers:
             now = datetime.now()
             self.save("nodebox-%s.png" % now.strftime('%Y-%m-%d-%H-%M-%S'))
