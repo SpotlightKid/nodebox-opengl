@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Drawing primitives: Point, line, rect, ellipse, arrow, star, traingle.
+"""Drawing primitives: Point, line, rect, ellipse, arrow, star, triangle.
 
 The fill and stroke are two different shapes put on top of each other.
 
@@ -16,6 +16,7 @@ from .caching import precompile
 from .glext import *
 from .geometry import Point
 from .state import global_state as _g, state_mixin
+
 
 __all__ = (
     'Point',
@@ -40,11 +41,14 @@ def line(x0, y0, x1, y1, **kwargs):
 
     """
     fill, stroke, strokewidth, strokestyle = state_mixin(**kwargs)
+
     if stroke is not None and strokewidth > 0:
         glColor4f(stroke[0], stroke[1], stroke[2], stroke[3] * _g.alpha)
         glLineWidth(strokewidth)
+
         if strokestyle != _g.strokestyle:
             glLineDash(strokestyle)
+
         glBegin(GL_LINES)
         glVertex2f(x0, y0)
         glVertex2f(x1, y1)
@@ -83,12 +87,15 @@ def triangle(x1, y1, x2, y2, x3, y3, **kwargs):
 
     """
     fill, stroke, strokewidth, strokestyle = state_mixin(**kwargs)
+
     for i, clr in enumerate((fill, stroke)):
         if clr is not None and (i == 0 or strokewidth > 0):
             if i == 1:
                 glLineWidth(strokewidth)
+
                 if strokestyle != _g.strokestyle:
                     glLineDash(strokestyle)
+
             glColor4f(clr[0], clr[1], clr[2], clr[3] * _g.alpha)
             # Note: this performs equally well as when using precompile().
             glBegin((GL_TRIANGLES, GL_LINE_LOOP)[i])
@@ -148,6 +155,7 @@ def arrow(x, y, width, **kwargs):
     head = width * 0.4
     tail = width * 0.2
     fill, stroke, strokewidth, strokestyle = state_mixin(**kwargs)
+
     for i, clr in enumerate((fill, stroke)):
         if clr is not None and (i == 0 or strokewidth > 0):
             if i == 1:
@@ -204,12 +212,15 @@ def fast_star(x, y, points=20, outer=100, inner=50, **kwargs):
         _stars[(points, iscale, oscale)] = cached
 
     fill, stroke, strokewidth, strokestyle = state_mixin(**kwargs)
+
     for i, clr in enumerate((fill, stroke)):
         if clr is not None and (i == 0 or strokewidth > 0):
             if i == 1:
                 glLineWidth(strokewidth)
+
                 if strokestyle != _g.strokestyle:
                     glLineDash(strokestyle)
+
             glColor4f(clr[0], clr[1], clr[2], clr[3] * _g.alpha)
             glPushMatrix()
             glTranslatef(x, y, 0)
