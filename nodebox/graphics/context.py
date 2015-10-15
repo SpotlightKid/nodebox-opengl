@@ -252,6 +252,7 @@ def supershape(x, y, width, height, m, n1, n2, n3, points=100, percentage=1.0,
 
     return path
 
+
 #--- ANIMATION ----------------------------------------------------------------
 # A sequence of images displayed in a loop.
 # Useful for storing pre-rendered effect frames like explosions etc.
@@ -1137,7 +1138,7 @@ class Transition(object):
         Transition.stop.
 
         """
-        if duration == 0:
+        if not duration:
             # If no duration is given,
             # Transition.start = Transition.current = Transition.stop.
             self._vi = value
@@ -1150,9 +1151,11 @@ class Transition(object):
     @property
     def start(self):
         return self._v0
+
     @property
     def stop(self):
         return self._v1
+
     @property
     def current(self):
         return self._vi
@@ -1178,7 +1181,8 @@ class Transition(object):
             return True
         else:
             # Calculate t: the elapsed time as a number between 0.0 and 1.0.
-            t = (TIME-self._t0) / (self._t1-self._t0)
+            t = (TIME - self._t0) / (self._t1 - self._t0)
+
             if self._interpolation == LINEAR:
                 self._vi = self._v0 + (self._v1-self._v0) * t
             else:
@@ -1199,23 +1203,30 @@ class Transition(object):
 
 _UID = 0
 def _uid():
-    global _UID; _UID+=1; return _UID
+    global _UID
+    _UID += 1
+    return _UID
+
 
 RELATIVE = "relative" # Origin point is stored as float, e.g. (0.5, 0.5).
 ABSOLUTE = "absolute" # Origin point is stored as int, e.g. (100, 100).
 
+
 class LayerRenderError(Exception):
     pass
+
 
 # When Layer.clipped=True, children are clipped to the bounds of the layer.
 # The layer clipping masks lazily changes size with the layer.
 class LayerClippingMask(ClippingMask):
     def __init__(self, layer):
         self.layer = layer
+
     def draw(self, fill=(0,0,0,1), stroke=None):
         w = not self.layer.width  and geometry.INFINITE or self.layer.width
         h = not self.layer.height and geometry.INFINITE or self.layer.height
         rect(0, 0, w, h, fill=fill, stroke=stroke)
+
 
 class Layer(list, Prototype, EventHandler):
 
@@ -1230,7 +1241,7 @@ class Layer(list, Prototype, EventHandler):
 
         """
         if origin == CENTER:
-            origin = (0.5,0.5)
+            origin = (0.5, 0.5)
             origin_mode = RELATIVE
         elif isinstance(origin[0], float) and isinstance(origin[1], float):
             origin_mode = RELATIVE
@@ -1240,31 +1251,33 @@ class Layer(list, Prototype, EventHandler):
         Prototype.__init__(self) # Facilitates extension on the fly.
         EventHandler.__init__(self)
         self._id = _uid()
-        self.name = name                  # Layer name. Layers are accessible as ParentLayer.[name]
-        self.canvas = None                  # The canvas this layer is drawn to.
-        self.parent = parent                # The layer this layer is a child of.
-        self._x = Transition(x)         # Layer horizontal position in pixels, from the left.
-        self._y = Transition(y)         # Layer vertical position in pixels, from the bottom.
-        self._width = Transition(width)     # Layer width in pixels.
-        self._height = Transition(height)    # Layer height in pixels.
-        self._dx = Transition(origin[0]) # Transformation origin point.
-        self._dy = Transition(origin[1]) # Transformation origin point.
-        self._origin = origin_mode           # Origin point as RELATIVE or ABSOLUTE coordinates?
-        self._scale = Transition(scale)     # Layer width and height scale.
+        self.name = name                       # Layer name. Layers are accessible as ParentLayer.[name]
+        self.canvas = None                     # The canvas this layer is drawn to.
+        self.parent = parent                   # The layer this layer is a child of.
+        self._x = Transition(x)                # Layer horizontal position in pixels, from the left.
+        self._y = Transition(y)                # Layer vertical position in pixels, from the bottom.
+        self._width = Transition(width)        # Layer width in pixels.
+        self._height = Transition(height)      # Layer height in pixels.
+        self._dx = Transition(origin[0])       # Transformation origin point.
+        self._dy = Transition(origin[1])       # Transformation origin point.
+        self._origin = origin_mode             # Origin point as RELATIVE or ABSOLUTE coordinates?
+        self._scale = Transition(scale)        # Layer width and height scale.
         self._rotation = Transition(rotation)  # Layer rotation.
-        self._opacity = Transition(opacity)   # Layer opacity.
-        self.duration = duration              # The time it takes to animate transformations.
-        self.top = True                  # Draw on top of or beneath parent?
-        self.flipped = False                 # Flip the layer horizontally?
-        self.clipped = False                 # Clip child layers to bounds?
-        self.hidden = False                 # Hide the layer?
+        self._opacity = Transition(opacity)    # Layer opacity.
+        self.duration = duration               # The time it takes to animate transformations.
+        self.top = True                        # Draw on top of or beneath parent?
+        self.flipped = False                   # Flip the layer horizontally?
+        self.clipped = False                   # Clip child layers to bounds?
+        self.hidden = False                    # Hide the layer?
         self._transform_cache = None           # Cache of the local transformation matrix.
         self._transform_stack = None           # Cache of the cumulative transformation matrix.
         self._clipping_mask = LayerClippingMask(self)
 
     @classmethod
     def from_image(self, img, *args, **kwargs):
-        """Return a new layer that renders the given image, and with the same size as the image.
+        """Return a new layer that renders the given image.
+
+        The layer will have the same size as the image.
 
         The layer's draw() method and an additional image property are set.
 
@@ -1292,6 +1305,7 @@ class Layer(list, Prototype, EventHandler):
         """
         def draw(layer):
             function(layer)
+
         layer = self(*args, **kwargs)
         layer.set_method(draw)
         return layer
@@ -1343,11 +1357,14 @@ class Layer(list, Prototype, EventHandler):
             if layer.name == key:
                 return layer
 
-        raise AttributeError("%s instance has no attribute '%s'" % (self.__class__.__name__, key))
+        raise AttributeError("%s instance has no attribute '%s'" %
+                             (self.__class__.__name__, key))
 
     def _set_container(self, key, value):
-        # If Layer.canvas is set to None, the canvas should no longer contain the layer.
-        # If Layer.canvas is set to Canvas, this canvas should contain the layer.
+        # If Layer.canvas is set to None, the canvas should no longer contain
+        # the layer.
+        # If Layer.canvas is set to Canvas, this canvas should contain the
+        # layer.
         # Remove the layer from the old canvas/parent.
         # Append the layer to the new container.
         if self in (self.__dict__.get(key) or ()):
@@ -1419,6 +1436,7 @@ class Layer(list, Prototype, EventHandler):
         self._transform_cache = None
         self._y.set(val, self.duration)
 
+    # Do not use property decorator, because _set_width is used elsewhere
     def _get_width(self):
         return self._width.get()
 
@@ -1428,6 +1446,7 @@ class Layer(list, Prototype, EventHandler):
 
     width = property(_get_width, _set_width)
 
+    # Do not use property decorator, because _set_height is used elsewhere
     def _get_height(self):
         return self._height.get()
 
@@ -1594,14 +1613,12 @@ class Layer(list, Prototype, EventHandler):
             layer._update()
 
     def update(self):
-        """Override this method to provide custom updating code.
-        """
+        """Override this method to provide custom updating code."""
         pass
 
     @property
     def done(self):
-        """Return True when all transitions have finished.
-        """
+        """Return True when all transitions have finished."""
         return all(
             self._x.done,
             self._y.done,
@@ -1695,13 +1712,17 @@ class Layer(list, Prototype, EventHandler):
         if self.hidden:
             # Don't do costly operations on layers the user can't see.
             return None
+
         if enabled and not self.enabled:
             # Skip disabled layers during event propagation.
             return None
+
         if _covered:
             # An ancestor is blocking this layer, so we can't select it.
             return None
+
         hit = self.contains(x, y, transformed)
+
         if clipped:
             # If (x,y) is not inside the clipped bounds, return None.
             # If children protruding beyond the layer's bounds are clipped,
@@ -1723,10 +1744,12 @@ class Layer(list, Prototype, EventHandler):
             # The covered-state starts as False, but stays True once it switches.
             _covered = _covered or (hit and not child.top)
             child = child.layer_at(x, y, clipped, enabled, transformed, _covered)
+
             if child is not None:
                 # Note: "if child:" won't work because it can be an empty list (no children).
                 # Should be improved by not having Layer inherit from list.
                 return child
+
         if hit:
             return self
         else:
@@ -1780,7 +1803,9 @@ class Layer(list, Prototype, EventHandler):
                     tf.translate(round(dx), round(dy))
                     self._transform_stack = self._transform_cache.copy()
                     self._transform_stack.prepend(tf)
+
             return self._transform_stack
+
         return self._transform_cache
 
     @property
@@ -1805,9 +1830,11 @@ class Layer(list, Prototype, EventHandler):
         w = max(p[0][0], p[1][0], p[2][0], p[3][0]) - x
         h = max(p[0][1], p[1][1], p[2][1], p[3][1]) - y
         b = geometry.Bounds(x, y, w, h)
+
         if not local:
             for child in self:
                 b = b.union(child.bounds)
+
         return b
 
     @property
