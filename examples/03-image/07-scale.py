@@ -14,32 +14,18 @@ class ImageCanvas(Canvas):
         self.img = img
         Canvas.__init__(self, *args, **kwargs)
 
-    def _maximize_height(self):
-        self.iheight = self.height
-        self.iwidth = img.width * (self.height / self.img.height)
-        self.iy = 0
-        self.ix = (self.width - self.iwidth) / 2
-
-    def _maximize_width(self):
-        self.iwidth = self.width
-        self.iheight = img.height * (self.width / self.img.width)
-        self.ix = 0
-        self.iy = (self.height - self.iheight) / 2
-
     def on_resize(self):
-        if self.width >= self.height:
-            if img.width >= img.height:
-                self._maximize_height()
-            else:
-                self._maximize_width()
-        else:
-            if img.width >= img.height:
-                self._maximize_width()
-            else:
-                self._maximize_height()
+        self.iheight = self.img.height * (self.width / self.img.width)
 
-    def setup(self):
-        self.on_resize()
+        if self.iheight > self.height:
+            self.iheight = self.height
+            self.iwidth = self.img.width * (self.height / self.img.height)
+            self.iy = 0
+            self.ix = (self.width - self.iwidth) / 2
+        else:
+            self.iwidth = self.width
+            self.ix = 0
+            self.iy = (self.height - self.iheight) / 2
 
     def draw(self):
         self.clear()
@@ -48,10 +34,6 @@ class ImageCanvas(Canvas):
               height=self.iheight)
 
 
-if len(sys.argv) >= 2:
-    img = Image(sys.argv[1])
-else:
-    img = Image('creature.png')
-
+img = Image(sys.argv[1] if len(sys.argv) >= 2 else 'creature.png')
 canvas = ImageCanvas(img, 800, 600, resizable=True)
 canvas.run()
