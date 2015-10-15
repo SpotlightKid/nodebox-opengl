@@ -17,41 +17,158 @@ from pyglet.image import Texture, SolidColorImagePattern
 from .image import Image, texture
 from .geometry import lerp, clamp
 
-def next(generator, default=None):
+__all__ = (
+    'ADD',
+    'BRIGHTNESS',
+    'BUILD',
+    'BUMP',
+    'COMPILE',
+    'CONTRAST',
+    'DARKEN',
+    'DEFAULT',
+    'DEFAULT_FRAGMENT_SHADER',
+    'DEFAULT_VERTEX_SHADER',
+    'DENT',
+    'FBO',
+    'FISHEYE',
+    'HARDLIGHT',
+    'HUE',
+    'LIGHTEN',
+    'LINEAR',
+    'MIRROR',
+    'MULTIPLY',
+    'OVERLAY',
+    'PINCH',
+    'RADIAL',
+    'SATURATION',
+    'SCREEN',
+    'SPLASH',
+    'STRETCH',
+    'SUBTRACT',
+    'SUPPORTED',
+    'TWIRL',
+    'AlphaMask',
+    'AlphaTransparency',
+    'Blend',
+    'BrightPass',
+    'BrightnessAdjustment',
+    'CanvasConfig',
+    'Colorize',
+    'Compositing',
+    'Config',
+    'ConfigException',
+    'Context',
+    'ContextException',
+    'ContrastAdjustment',
+    'Distortion',
+    'Filter',
+    'Gaussian3x3Blur',
+    'HorizontalBlur',
+    'HueAdjustment',
+    'Invert',
+    'LinearGradient',
+    'OffscreenBuffer',
+    'OffscreenBufferError',
+    'RadialGradient',
+    'RenderedImage',
+    'SaturationAdjustment',
+    'Shader',
+    'ShaderError',
+    'ShaderFacade',
+    'VerticalBlur',
+    'add',
+    'adjust',
+    'adjusted',
+    'blend',
+    'blended',
+    'bloom',
+    'blur',
+    'blurred',
+    'brightpass',
+    'bump',
+    'ceil2',
+    'colorize',
+    'colorized',
+    'darken',
+    'dent',
+    'desaturate',
+    'desaturated',
+    'distorted',
+    'dropshadow',
+    'extent2',
+    'filter',
+    'gradient',
+    'grayscale',
+    'hardlight',
+    'hue',
+    'invert',
+    'inverted',
+    'lighten',
+    'mask',
+    'masked',
+    'mirror',
+    'multiply',
+    'overlay',
+    'pinch',
+    'ratio2',
+    'render',
+    'screen',
+    'shader',
+    'solid',
+    'splash',
+    'src',
+    'stretch',
+    'subtract',
+    'transparent',
+    'twirl',
+    'vec2',
+    'vec3',
+    'vec4',
+    'vector',
+)
+
+
+# helper functions
+
+_pow2 = [2 ** n for n in range(20)]  # [1, 2, 4, 8, 16, 32, 64, ...]
+
+def _next(generator, default=None):
     try:
         return generator.next()
     except StopIteration:
         return default
 
-#==============================================================================
-
-pow2 = [2**n for n in range(20)] # [1, 2, 4, 8, 16, 32, 64, ...]
 
 def ceil2(x):
-    """ Returns the nearest power of 2 that is higher than x, e.g. 700 => 1024.
-    """
-    for y in pow2:
+    """Return nearest power of 2 that is higher than x, e.g. 700 => 1024."""
+    for y in _pow2:
         if y >= x: return y
 
+
 def extent2(texture):
-    """ Returns the extent of the image data (0.0-1.0, 0.0-1.0) inside its texture owner.
-        Textures have a size power of 2 (512, 1024, ...), but the actual image can be smaller.
-        For example: a 400x250 image will be loaded in a 512x256 texture.
-        Its extent is (0.78, 0.98), the remainder of the texture is transparent.
+    """Return extent of the image data (0.0-1.0, 0.0-1.0) inside its texture owner.
+
+    Textures have a size power of 2 (512, 1024, ...), but the actual image can
+    be smaller.
+
+    For example: a 400x250 image will be loaded in a 512x256 texture. Its
+    extent is (0.78, 0.98), the remainder of the texture is transparent.
+
     """
     return (texture.tex_coords[3], texture.tex_coords[7])
 
+
 def ratio2(texture1, texture2):
-    """ Returns the size ratio (0.0-1.0, 0.0-1.0) of two texture owners.
-    """
+    """Return size ratio (0.0-1.0, 0.0-1.0) of two texture owners."""
     return (
         float(ceil2(texture1.width)) / ceil2(texture2.width),
         float(ceil2(texture1.height)) / ceil2(texture2.height)
     )
 
-#=====================================================================================================
 
-#--- SHADER ------------------------------------------------------------------------------------------
+# =============================================================================
+
+# -- SHADER -------------------------------------------------------------------
 # A shader is a pixel effect (motion blur, fog, glow) executed on the GPU.
 # The effect has two distinct parts: a vertex shader and a fragment shader.
 # The vertex shader retrieves the coordinates of the current pixel.
@@ -76,38 +193,53 @@ uniform sampler2D src;
 void main() {
     gl_FragColor = texture2D(src, gl_TexCoord[0].xy);
 }'''
+COMPILE = "compile" # Error occurs during glCompileShader().
+BUILD   = "build"   # Error occurs during glLinkProgram().
+SUPPORTED = True # Graphics hardware supports shaders?
+
 
 class vector(tuple):
     pass
 
 def vec2(f1, f2):
     return vector((f1, f2))
+
+
 def vec3(f1, f2, f3):
     return vector((f1, f2, f3))
+
+
 def vec4(f1, f2, f3, f4):
     return vector((f1, f2, f3, f4))
 
-COMPILE = "compile" # Error occurs during glCompileShader().
-BUILD   = "build"   # Error occurs during glLinkProgram().
+
 class ShaderError(Exception):
     def __init__(self, value, type=COMPILE):
         Exception.__init__(self, "%s error: %s" % (type, value))
         self.value = value
         self.type  = type
 
-class Shader(object):
 
+class Shader(object):
+    """A per-pixel shader effect (blur, fog, glow, ...) executed on the GPU.
+
+    Shader wraps a compiled GLSL program and facilitates passing parameters to
+    it. The fragment and vertex parameters contain the GLSL source code to
+    execute.
+
+    Raises a ShaderError if the source fails to compile.
+
+    Once compiled, you can set uniform variables in the GLSL source with
+    Shader.set().
+
+    """
     def __init__(self, vertex=DEFAULT, fragment=DEFAULT):
-        """ A per-pixel shader effect (blur, fog, glow, ...) executed on the GPU.
-            Shader wraps a compiled GLSL program and facilitates passing parameters to it.
-            The fragment and vertex parameters contain the GLSL source code to execute.
-            Raises a ShaderError if the source fails to compile.
-            Once compiled, you can set uniform variables in the GLSL source with Shader.set().
-        """
         if vertex == DEFAULT:
             vertex = DEFAULT_VERTEX_SHADER
+
         if fragment == DEFAULT:
             fragment = DEFAULT_FRAGMENT_SHADER
+
         self._vertex   = vertex   # GLSL source for vertex shader.
         self._fragment = fragment # GLSL source for fragment shader.
         self._compiled = []
@@ -117,16 +249,21 @@ class Shader(object):
         self._build()
 
     def _compile(self, source, type=GL_VERTEX_SHADER):
-        # Compile the GLSL source code, either as GL_FRAGMENT_SHADER or GL_VERTEX_SHADER.
-        # If the source fails to compile, retrieve the error message and raise ShaderError.
+        # Compile the GLSL source code, either as GL_FRAGMENT_SHADER or
+        # GL_VERTEX_SHADER.
+        # If the source fails to compile, retrieve the error message and raise
+        # ShaderError.
         # Store the compiled shader so we can delete it later on.
         shader = glCreateShader(type)
         status = c_int(-1)
-        glShaderSource(shader, 1, cast(pointer(c_char_p(source)), POINTER(POINTER(c_char))), None)
+        glShaderSource(shader, 1, cast(pointer(c_char_p(source)),
+                                       POINTER(POINTER(c_char))), None)
         glCompileShader(shader)
         glGetShaderiv(shader, GL_COMPILE_STATUS, byref(status))
+
         if status.value == 0:
             raise self._error(shader, type=COMPILE)
+
         self._compiled.append(shader)
         return shader
 
@@ -135,14 +272,19 @@ class Shader(object):
         # Compile fragment and vertex shaders and build the program.
         program = glCreateProgram()
         status  = c_int(-1)
+
         if self._vertex:
             glAttachShader(program, self._compile(self._vertex, GL_VERTEX_SHADER))
+
         if self._fragment:
             glAttachShader(program, self._compile(self._fragment, GL_FRAGMENT_SHADER))
+
         glLinkProgram(program)
         glGetProgramiv(program, GL_LINK_STATUS, byref(status))
+
         if status.value == 0:
             raise self._error(program, type=BUILD)
+
         self._program = program
 
     def _error(self, obj, type=COMPILE):
@@ -154,28 +296,36 @@ class Shader(object):
         f3 = type==COMPILE and glDeleteShader     or glDeleteProgram
         length = c_int(); f1(obj, GL_INFO_LOG_LENGTH, byref(length))
         msg = ""
+
         if length.value > 0:
             msg = create_string_buffer(length.value); f2(obj, length, byref(length), msg)
             msg = msg.value
+
         f3(obj)
         return ShaderError(msg, type)
 
     def get(self, name):
-        """ Returns the value of the variable with the given name.
-        """
+        """Return the value of the variable with the given name."""
         return self.variables[name]
 
     def set(self, name, value):
-        """ Set the value of the variable with the given name in the GLSL source script.
-            Supported variable types are: vec2(), vec3(), vec4(), single int/float, list of int/float.
-            Variables will be initialized when Shader.push() is called (i.e. glUseProgram).
+        """Set the value of the variable with the given name in the GLSL source script.
+
+        Supported variable types are: vec2(), vec3(), vec4(), single int/float,
+        list of int/float.
+
+        Variables will be initialized when Shader.push() is called (i.e.
+        glUseProgram).
+
         """
         self.variables[name] = value
+
         if self._active:
             self._set(name, value)
 
     def _set(self, name, value):
         address = glGetUniformLocation(self._program, name)
+
         # A vector with 2, 3 or 4 floats representing vec2, vec3 or vec4.
         if isinstance(value, vector):
             if len(value) == 2:
@@ -186,7 +336,7 @@ class Shader(object):
                 glUniform4f(address, value[0], value[1], value[2], value[3])
         # A list representing an array of ints or floats.
         elif isinstance(value, (list, tuple)):
-            if next((v for v in value if isinstance(v, float))) is not None:
+            if _next((v for v in value if isinstance(v, float))) is not None:
                 array = c_float * len(value)
                 glUniform1fv(address, len(value), array(*value))
             else:
@@ -202,20 +352,25 @@ class Shader(object):
             ShaderError, "don't know how to handle variable %s" % value.__class__
 
     def push(self):
-        """ Installs the program and sets its variables.
-            When you use the image() command between shader.push() and shader.pop(),
-            the shader's effect will be applied to the image before drawing it.
-            To use shader effects in combination with paths,
-            draw the path in an offscreen buffer, render it, and apply to effect to the render.
+        """Install the program and sets its variables.
+
+        When you use the image() command between shader.push() and
+        shader.pop(), the shader's effect will be applied to the image before
+        drawing it.
+
+        To use shader effects in combination with paths, draw the path in an
+        offscreen buffer, render it, and apply to effect to the render.
+
         """
         self._active = True
         glUseProgram(self._program)
+
         for k, v in self.variables.items():
             self._set(k, v)
 
     def pop(self):
-        # Note that shaders can't be nested since they all have their own program,
-        # pop() just removes any active program.
+        # Note that shaders can't be nested since they all have their own
+        # program, pop() just removes any active program.
         if self._active == True:
             glUseProgram(0)
             self._active = False
@@ -235,38 +390,49 @@ class Shader(object):
                     glDetachShader(self._program, shader)
                 if glDeleteShader:
                     glDeleteShader(shader)
+
             if glDeleteProgram:
                 glDeleteProgram(self._program)
         except:
             pass
 
+
 class ShaderFacade:
     def __init__(self, vertex=None, fragment=None):
         # Acts like a shader but doesn't do anything.
         pass
+
     @property
     def variables(self):
         return {}
+
     @property
     def active(self):
         return None
+
     def get(self, name):
         return None
+
     def set(self, name, value):
         pass
+
     def push(self):
         pass
+
     def pop(self):
         pass
 
-SUPPORTED = True # Graphics hardware supports shaders?
 
 def shader(vertex=DEFAULT_VERTEX_SHADER, fragment=DEFAULT_FRAGMENT_SHADER, silent=True):
-    """ Returns a compiled Shader from the given GLSL source code.
-        With silent=True, never raises an error but instead returns a ShaderFacade.
-        During startup, a number of Shaders are created.
-        This mechanisms ensures that the module doesn't crash while doing this,
-        instead the shader simply won't have any visible effect and SUPPORTED will be False.
+    """Return a compiled Shader from the given GLSL source code.
+
+    With silent=True, never raises an error but instead returns a ShaderFacade.
+    During startup, a number of Shaders are created.
+
+    This mechanisms ensures that the module doesn't crash while doing this,
+    instead the shader simply won't have any visible effect and SUPPORTED will
+    be False.
+
     """
     if not silent:
         return Shader(vertex, fragment)
@@ -277,40 +443,46 @@ def shader(vertex=DEFAULT_VERTEX_SHADER, fragment=DEFAULT_FRAGMENT_SHADER, silen
         SUPPORTED = False
         return ShaderFacade()
 
-#=====================================================================================================
+#==============================================================================
 
-#--- FILTER ------------------------------------------------------------------------------------------
+# -- FILTER -------------------------------------------------------------------
 # Stores a shader's variables and applies them once push() is called.
-# The shader is created only once for perfomance while filters can exist multiple times.
-# Textures that are drawn between Filter.push() and Filter.pop() have the effect applied to them.
+# The shader is created only once for perfomance while filters can exist
+# multiple times.
+# Textures that are drawn between Filter.push() and Filter.pop() have the
+# effect applied to them.
 
 class Filter(object):
+    """Filter combines a Shader with variable settings.
+
+    Variables need to be prepared in Filter.push() before passing them to the
+    shader: e.g. creating a list of kernel values, calculating a scale based on
+    image height, ...
+
+    Performance note: create the Shader separately, not during initialization.
+
+    """
 
     def __init__(self):
-        """ Filter combines a Shader with variable settings.
-            Variables need to be prepared in Filter.push() before passing them to the shader:
-            e.g. creating a list of kernel values, calculating a scale based on image height, ...
-            Performance note: create the Shader separately, not during initialization.
-        """
         # Shader and its variables need to be stored here.
         self.shader  = None
         self.texture = None
 
     def push(self):
-        """ Installs the filter so it will be applied to the next image() call.
+        """Install the filter so it will be applied to the next image() call.
         """
         # Shader needs to set its variables here:
         # self.shader.set(variable, value)
         self.shader.push()
 
     def pop(self):
-        """ Removes the filter.
-        """
+        """Remove the filter."""
         self.shader.pop()
 
-#=====================================================================================================
 
-#--- INVERT -----------------------------------------------------------------------------------------
+#==============================================================================
+
+# -- INVERT -------------------------------------------------------------------
 
 _invert = shader(fragment='''
 uniform sampler2D src;
@@ -318,6 +490,7 @@ void main() {
     gl_FragColor = texture2D(src, gl_TexCoord[0].xy);
     gl_FragColor.rgb = 1.0 - gl_FragColor.rgb;
 }''')
+
 
 class Invert(Filter):
 
@@ -328,7 +501,8 @@ class Invert(Filter):
     def push(self):
         self.shader.push()
 
-#--- GRADIENT ----------------------------------------------------------------------------------------
+
+# -- GRADIENT -----------------------------------------------------------------
 
 LINEAR = "linear"
 RADIAL = "radial"
@@ -352,9 +526,10 @@ void main() {
     gl_FragColor = clr1 * (1.0 - d) + clr2 * d;
 }''')
 
+
 class LinearGradient(Filter):
 
-    def __init__(self, texture, clr1=vec4(0,0,0,1), clr2=vec4(1,1,1,1)):
+    def __init__(self, texture, clr1=vec4(0, 0, 0, 1), clr2=vec4(1, 1, 1, 1)):
         self.shader  = _gradient[LINEAR]
         self.texture = texture
         self.clr1    = clr1
@@ -365,9 +540,10 @@ class LinearGradient(Filter):
         self.shader.set("clr2", self.clr2)
         self.shader.push()
 
+
 class RadialGradient(Filter):
 
-    def __init__(self, texture, clr1=vec4(0,0,0,1), clr2=vec4(1,1,1,1)):
+    def __init__(self, texture, clr1=vec4(0, 0, 0, 1), clr2=vec4(1, 1, 1, 1)):
         self.shader  = _gradient[RADIAL]
         self.texture = texture
         self.clr1    = clr1
@@ -378,7 +554,8 @@ class RadialGradient(Filter):
         self.shader.set("clr2", self.clr2)
         self.shader.push()
 
-#--- COLORIZE ---------------------------------------------------------------------------------------
+
+#--- COLORIZE -----------------------------------------------------------------
 
 _colorize = shader(fragment='''
 uniform sampler2D src;
@@ -391,7 +568,7 @@ void main() {
 
 class Colorize(Filter):
 
-    def __init__(self, texture, color=vec4(1,1,1,1), bias=vec4(0,0,0,0)):
+    def __init__(self, texture, color=vec4(1, 1, 1, 1), bias=vec4(0, 0, 0, 0)):
         self.shader  = _colorize
         self.texture = texture
         self.color   = color
@@ -402,8 +579,10 @@ class Colorize(Filter):
         self.shader.set("bias",  self.bias)
         self.shader.push()
 
-#--- COLORSPACE -------------------------------------------------------------------------------------
-# Helper functions for conversion between RGB and HSB that we can use in other filters.
+
+# -- COLORSPACE ---------------------------------------------------------------
+# Helper functions for conversion between RGB and HSB that we can use in other
+# filters.
 # Based on "Photoshop math with GLSL shaders" (2009), Romain Dura,
 # http://blog.mouaif.org/?p=94
 
@@ -444,7 +623,8 @@ vec3 rgb2hsb(vec3 rgb) {
     return hsb;
 }''';
 
-#--- ADJUSTMENTS ------------------------------------------------------------------------------------
+
+# -- ADJUSTMENTS --------------------------------------------------------------
 
 BRIGHTNESS = "brightness"
 CONTRAST   = "contrast"
@@ -489,6 +669,7 @@ void main() {
     gl_FragColor = vec4(hsb2rgb(hsb).xyz, p.a);
 }''')
 
+
 class BrightnessAdjustment(Filter):
 
     def __init__(self, texture, m=1.0):
@@ -499,6 +680,7 @@ class BrightnessAdjustment(Filter):
     def push(self):
         self.shader.set("m", float(self.m-1))
         self.shader.push()
+
 
 class ContrastAdjustment(Filter):
 
@@ -511,6 +693,7 @@ class ContrastAdjustment(Filter):
         self.shader.set("m", float(self.m))
         self.shader.push()
 
+
 class SaturationAdjustment(Filter):
 
     def __init__(self, texture, m=1.0):
@@ -521,6 +704,7 @@ class SaturationAdjustment(Filter):
     def push(self):
         self.shader.set("m", float(max(self.m, 0)))
         self.shader.push()
+
 
 class HueAdjustment(Filter):
 
@@ -533,10 +717,11 @@ class HueAdjustment(Filter):
         self.shader.set("m", float(self.m));
         self.shader.push()
 
-#--- BRIGHTPASS --------------------------------------------------------------------------------------
-# Note: the magic numbers 0.2125, 0.7154, 0.0721 represent how (in RGB)
-# green contributes the most to luminosity while blue hardly contributes anything.
-# Thus, luminance L = R*0.2125 + G*0.7154 + B+0.0721
+
+# -- BRIGHTPASS ---------------------------------------------------------------
+# Note: the magic numbers 0.2125, 0.7154, 0.0721 represent how (in RGB) green
+# contributes the most to luminosity while blue hardly contributes anything.
+# Thus, luminance L = R * 0.2125 + G * 0.7154 + B * 0.0721
 
 _brightpass = shader(fragment='''
 uniform sampler2D src;
@@ -546,6 +731,7 @@ void main() {
     float L = dot(p.rgb, vec3(0.2125, 0.7154, 0.0721)); // luminance
     gl_FragColor = (L > threshold)? vec4(p.rgb, p.a) : vec4(0.0, 0.0, 0.0, p.a);
 }''')
+
 
 class BrightPass(Filter):
 
@@ -558,11 +744,13 @@ class BrightPass(Filter):
         self.shader.set("threshold", float(self.threshold));
         self.shader.push()
 
-#--- BLUR --------------------------------------------------------------------------------------------
+
+# -- BLUR ---------------------------------------------------------------------
 # Based on "Gaussian Blur Filter Shader" (2008),
 # http://www.gamerendering.com/2008/10/11/gaussian-blur-filter-shader/
-# Blurring occurs in two steps (requiring an FBO): horizontal blur and vertical blur.
-# Separating these two steps reduces the problem to linear complexity (i.e. it is faster).
+# Blurring occurs in two steps (requiring an FBO): horizontal blur and vertical
+# blur. Separating these two steps reduces the problem to linear complexity
+# (i.e. it is faster).
 
 glsl_blur = '''
 uniform sampler2D src;
@@ -589,6 +777,7 @@ _blur = {
     "vertical"  : shader(fragment=glsl_blur % ("","-a","","+a"))  # vary v.y
 }
 
+
 class HorizontalBlur(Filter):
 
     def __init__(self, texture, kernel=9, scale=1.0):
@@ -602,6 +791,7 @@ class HorizontalBlur(Filter):
         self.shader.set("radius", float(self.scale) / self.texture.width)
         self.shader.set("extent", vec2(*extent2(self.texture)))
         self.shader.push()
+
 
 class VerticalBlur(Filter):
 
@@ -617,9 +807,11 @@ class VerticalBlur(Filter):
         self.shader.set("extent", vec2(*extent2(self.texture)))
         self.shader.push()
 
+
 # It is useful to have a blur in a single pass as well,
 # which we can use as a parameter for the image() command.
-# However, for a simple 3x3 in separate steps => 6 calculations, single pass => 9 calculations.
+# However, for a simple 3x3 in separate steps => 6 calculations,
+# single pass => 9 calculations.
 _blur["gaussian3x3"] = shader(fragment='''
 uniform sampler2D src;
 uniform vec2 radius;
@@ -640,6 +832,7 @@ void main() {
     gl_FragColor = p / 16.0;
 }''')
 
+
 class Gaussian3x3Blur(Filter):
 
     def __init__(self, texture, scale=1.0):
@@ -653,7 +846,8 @@ class Gaussian3x3Blur(Filter):
         self.shader.set("radius", vec2(x, y))
         self.shader.push()
 
-#--- COMPOSITING -------------------------------------------------------------------------------------
+
+# -- COMPOSITING --------------------------------------------------------------
 
 # Compositing function.
 # It will be reused in alpha compositing and blending filters below.
@@ -685,10 +879,13 @@ void main() {
 class Compositing(Filter):
 
     def __init__(self, shader, texture, blend, alpha=1.0, dx=0, dy=0):
-        """ A filter that mixes a base image (the destination) with a blend image (the source).
-            Used to implement alpha compositing and blend modes.
-            - dx: the horizontal offset (in pixels) of the blend layer.
-            - dy: the vertical offset (in pixels) of the blend layer.
+        """A filter that mixes a base image (the destination) with a blend image (the source).
+
+        Used to implement alpha compositing and blend modes.
+
+        - dx: the horizontal offset (in pixels) of the blend layer.
+        - dy: the vertical offset (in pixels) of the blend layer.
+
         """
         self.shader  = shader
         self.texture = texture
@@ -717,7 +914,8 @@ class Compositing(Filter):
         self.shader.set("alpha", self.alpha)
         self.shader.push()
 
-#--- ALPHA TRANSPARENCY ------------------------------------------------------------------------------
+
+# -- ALPHA TRANSPARENCY -------------------------------------------------------
 
 _alpha = {}
 _alpha["transparency"] = shader(fragment='''
@@ -742,13 +940,15 @@ class AlphaTransparency(Filter):
         self.shader.set("alpha", float(max(0, min(1, self.alpha))))
         self.shader.push()
 
+
 class AlphaMask(Compositing):
 
     def __init__(self, texture, blend, alpha=1.0, dx=0, dy=0):
         Compositing.__init__(self, _alpha["mask"], texture, blend, alpha, dx, dy)
         self.shader = _alpha["mask"]
 
-#--- BLEND MODES -------------------------------------------------------------------------------------
+
+# -- BLEND MODES --------------------------------------------------------------
 # Based on "Photoshop math with GLSL shaders" (2009), Romain Dura,
 # http://blog.mouaif.org/?p=94
 
@@ -799,15 +999,18 @@ _blend[HUE] = '''
 
 for f in _blend.keys():
     src = glsl_blend % _blend[f].strip()
-    src = f==HUE and glsl_rgb2hsb + glsl_hsb2rgb + src or src # Hue blend requires rgb2hsb() function.
+    # Hue blend requires rgb2hsb() function.
+    src = glsl_rgb2hsb + glsl_hsb2rgb + src if f == HUE else src
     _blend[f] = shader(fragment=src)
+
 
 class Blend(Compositing):
 
     def __init__(self, mode, texture, blend, alpha=1.0, dx=0, dy=0):
         Compositing.__init__(self, _blend[mode], texture, blend, alpha, dx, dy)
 
-#--- DISTORTION --------------------------------------------------------------------------------------
+
+# -- DISTORTION ---------------------------------------------------------------
 # Based on "PhotoBooth Demystified" (2007), Libero Spagnolini,
 # http://dem.ocracy.org/libero/photobooth/
 
@@ -888,17 +1091,24 @@ _distortion[STRETCH] = '''
     n = s * n;
 '''.strip()
 
+
 for f in (BUMP, DENT, PINCH, FISHEYE, SPLASH, TWIRL):
-    _distortion[f] = shader(fragment=glsl_distortion % (glsl_polar % _distortion[f], glsl_wrap[0]))
+    _distortion[f] = shader(fragment=glsl_distortion % (
+                            glsl_polar % _distortion[f], glsl_wrap[0]))
+
 for f in (STRETCH, MIRROR):
-    _distortion[f] = shader(fragment=glsl_distortion % (             _distortion[f], glsl_wrap[2]))
+    _distortion[f] = shader(fragment=glsl_distortion % (
+                            _distortion[f], glsl_wrap[2]))
+
 
 class Distortion(Filter):
+    """Distortion filter.
 
+    With dx, dy offset from the center (between -0.5 and 0.5), magnitude m as
+    the radius of effect, intensity i as the depth of the effect.
+
+    """
     def __init__(self, effect, texture, dx=0, dy=0, m=1.0, i=1.0):
-        """ Distortion filter with dx, dy offset from the center (between -0.5 and 0.5),
-            magnitude m as the radius of effect, intensity i as the depth of the effect.
-        """
         self.shader  = _distortion[effect]
         self.texture = texture
         self.dx      = dx
@@ -931,9 +1141,10 @@ class Distortion(Filter):
         self.shader.set("i", float(self.i))
         self.shader.push()
 
-#=====================================================================================================
 
-#--- FRAME BUFFER OBJECT -----------------------------------------------------------------------------
+# =============================================================================
+
+# -- FRAME BUFFER OBJECT ------------------------------------------------------
 # Based on "Frame Buffer Object 101" (2006), Rob Jones,
 # http://www.gamedev.net/reference/articles/article2331.asp
 
@@ -942,25 +1153,31 @@ def _uid():
     # Each FBO has a unique ID.
     global _UID; _UID+=1; return _UID;
 
+
 def _texture(width, height):
     # Returns an empty texture of the given width and height.
     return Texture.create(width, height)
 
+
 def glCurrentViewport(x=None, y=None, width=None, height=None):
-    """ Returns a (x, y, width, height)-tuple with the current viewport bounds.
-        If x, y, width and height are given, set the viewport bounds.
+    """Return a (x, y, width, height)-tuple with the current viewport bounds.
+
+    If x, y, width and height are given, set the viewport bounds.
+
     """
     # Why? To switch between the size of the onscreen canvas and the offscreen buffer.
     # The canvas could be 256x256 while an offscreen buffer could be 1024x1024.
     # Without switching the viewport, information from the buffer would be lost.
-    if x is not None and y is not None and width is not None and height is not None:
+    if None not in (x, y, width, height):
         glViewport(x, y, width, height)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         glOrtho(x, width, y, height, -1, 1)
         glMatrixMode(GL_MODELVIEW)
+
     xywh = (GLint*4)(); glGetIntegerv(GL_VIEWPORT, xywh)
     return tuple(xywh)
+
 
 # The FBO stack keeps track of nested FBO's.
 # When OffscreenBuffer.pop() is called, we revert to the previous buffer.
@@ -971,19 +1188,28 @@ _FBO_STACK = []
 class OffscreenBufferError(Exception):
     pass
 
-class OffscreenBuffer(object):
 
+class OffscreenBuffer(object):
+    """Frame Buffer Object stack.
+
+    The Frame Buffer Object is an OpenGL extension to do "Render to Texture",
+    drawing in an offscreen buffer.
+
+    It is useful as a place to chain multiple shaders, since each shader has
+    its own program and we can only install one program at a time.
+
+    """
     def __init__(self, width, height):
-        """ "FBO" is an OpenGL extension to do "Render to Texture", drawing in an offscreen buffer.
-            It is useful as a place to chain multiple shaders,
-            since each shader has its own program and we can only install one program at a time.
-        """
         self.id = c_uint(_uid())
-        try: glGenFramebuffersEXT(1, byref(self.id))
+
+        try:
+            glGenFramebuffersEXT(1, byref(self.id))
         except:
             raise OffscreenBufferError("offscreen buffer not supported.")
+
         self.texture   = None
-        self._viewport = (None, None, None, None) # The canvas bounds, set in OffscreenBuffer.push().
+        # The canvas bounds, set in OffscreenBuffer.push().
+        self._viewport = (None, None, None, None)
         self._active   = False
         self._init(width, height)
         #self._init_depthbuffer()
@@ -1004,9 +1230,14 @@ class OffscreenBuffer(object):
         return self._active
 
     def push(self):
-        """ Between push() and pop(), all drawing is done offscreen in OffscreenBuffer.texture.
-            The offscreen buffer has its own transformation state,
-            so any translate(), rotate() etc. does not affect the onscreen canvas.
+        """Push FBO onto the drawing stack.
+
+        Between push() and pop(), all drawing is done offscreen in
+        OffscreenBuffer.texture.
+
+        The offscreen buffer has its own transformation state, so any
+        translate(), rotate() etc. does not affect the onscreen canvas.
+
         """
         _FBO_STACK.append(self)
         glBindTexture(self.texture.target, self.texture.id)
@@ -1024,6 +1255,7 @@ class OffscreenBuffer(object):
         if glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT:
             msg = self.texture.width == self.texture.height == 0 and "width=0, height=0." or ""
             raise OffscreenBufferError(msg)
+
         # Separate the offscreen from the onscreen transform state.
         # Separate the offscreen from the onscreen canvas size.
         self._viewport = glCurrentViewport()
@@ -1048,8 +1280,11 @@ class OffscreenBuffer(object):
         self._active = True
 
     def pop(self):
-        """ Reverts to the onscreen canvas.
-            The contents of the offscreen buffer can be retrieved with OffscreenBuffer.texture.
+        """Revert to the onscreen canvas.
+
+        The contents of the offscreen buffer can be retrieved with
+        OffscreenBuffer.texture.
+
         """
         # Switch to onscreen canvas size and transformation state.
         # Switch to onscreen canvas.
@@ -1063,8 +1298,11 @@ class OffscreenBuffer(object):
         self._active = False
 
     def render(self):
-        """ Executes the drawing commands in OffscreenBuffer.draw() offscreen and returns image.
-            This is useful if you have a class that inherits from FBO with a draw() method.
+        """Execute the drawing commands in OffscreenBuffer.draw() offscreen and return image.
+
+        This is useful if you have a class that inherits from FBO with a draw()
+        method.
+
         """
         self.push()
         self.draw()
@@ -1075,22 +1313,28 @@ class OffscreenBuffer(object):
         pass
 
     def slice(self, x, y, width, height):
-        """ Returns a portion of the offscreen buffer as an image.
-        """
+        """Return a portion of the offscreen buffer as an image."""
         return self.texture.get_region(x, y, width, height)
 
     def reset(self, width=None, height=None):
-        """ Resizes the offscreen buffer by attaching a new texture to it.
-            This will destroy the contents of the previous buffer.
-            If you do not explicitly reset the buffer, the contents from previous drawing
-            between OffscreenBuffer.push() and OffscreenBuffer.pop() is retained.
+        """Resize the offscreen buffer by attaching a new texture to it.
+
+        This will destroy the contents of the previous buffer.
+
+        If you do not explicitly reset the buffer, the contents from previous
+        drawing between OffscreenBuffer.push() and OffscreenBuffer.pop() is
+        retained.
+
         """
         if self._active:
             raise OffscreenBufferError("can't reset offscreen buffer when active")
+
         if width is None:
             width = self.width
+
         if height is None:
             height = self.height
+
         self._init(width, height)
 
     def clear(self):
@@ -1121,9 +1365,10 @@ class OffscreenBuffer(object):
 
 FBO = OffscreenBuffer
 
-#=====================================================================================================
 
-#--- OFFSCREEN RENDERING -----------------------------------------------------------------------------
+#==============================================================================
+
+# -- OFFSCREEN RENDERING ------------------------------------------------------
 # Uses an offscreen buffer to render filters and drawing commands to images.
 
 try:
@@ -1131,15 +1376,20 @@ try:
 except OffscreenBufferError:
     _buffer = None
 
+
 def filter(img, filter=None, clear=True):
-    """ Returns a new Image object with the given filter applied to it.
-        - img   : an image that can be passed to the image() command.
-        - filter: an instance of the Filter class, with parameters set.
-        - clear : if True, clears the contents of the offscreen buffer and resizes it to the image.
+    """Return a new Image object with the given filter applied to it.
+
+    - img   : an image that can be passed to the image() command.
+    - filter: an instance of the Filter class, with parameters set.
+    - clear : if True, clears the contents of the offscreen buffer and resizes
+              it to the image.
+
     """
     # For file paths, textures and Pixel objects, create an Image first.
     if not isinstance(img, Image):
         img = Image(img)
+
     # Reuse main _buffer when possible, otherwise create one on the fly
     # (this will be necessary when filter() or render() is nested inside render()).
     if not _buffer or _buffer.active:
@@ -1149,10 +1399,13 @@ def filter(img, filter=None, clear=True):
         buffer.reset(img.texture.width, img.texture.height)
     else:
         buffer = _buffer
+
     buffer.push()
+
     if filter != None:
         filter.texture = img.texture # Register the current texture with the filter.
         filter.push()
+
     # This blend mode gives better results for transparent images:
     glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
     # Note: Image.alpha and Image.color attributes won't work here,
@@ -1163,6 +1416,7 @@ def filter(img, filter=None, clear=True):
         filter.pop()
     buffer.pop()
     return img.copy(texture=buffer.texture)
+
 
 class RenderedImage(Image):
 
@@ -1178,13 +1432,19 @@ class RenderedImage(Image):
         # XXX Colors will appear washed out in the exported image.
         Image.save(self, path)
 
+
 def render(function, width, height, clear=True, **kwargs):
-    """ Returns an Image object from a function containing drawing commands (i.e. a procedural image).
-        This is useful when, for example, you need to render filters on paths.
-        - function: a function containing drawing commands.
-        - width   : width of the offscreen canvas.
-        - height  : height of the offscreen canvas.
-        - clear   : when False, retains the contents of the offscreen canvas, without resizing it.
+    """Return an Image object from a function containing drawing commands.
+
+    This is useful when you want a procedural image, or, for example, you need
+    to render filters on paths or text objects.
+
+    - function: a function containing drawing commands.
+    - width   : width of the offscreen canvas.
+    - height  : height of the offscreen canvas.
+    - clear   : when False, retains the contents of the offscreen canvas,
+                without resizing it.
+
     """
     # Reuse main _buffer when possible, otherwise create one on the fly
     # (this will be necessary when render() is nested inside another render()).
@@ -1200,37 +1460,43 @@ def render(function, width, height, clear=True, **kwargs):
     buffer.pop()
     return RenderedImage(buffer.texture)
 
-#--- OFFSCREEN FILTERS -------------------------------------------------------------------------------
-# Images are rendered offscreen with the filter applied, and the new image returned.
+
+# -- OFFSCREEN FILTERS --------------------------------------------------------
+# Images are rendered offscreen with the filter applied, and the new image is
+# returned.
 
 def invert(img):
-    """ Returns an image with inverted colors (e.g. white becomes black).
-    """
+    """Return an image with inverted colors (e.g. white becomes black)."""
     return filter(img, Invert(img.texture))
 
+
 def solid(width, height, fill=(0,0,0,0)):
-    """ Generates an image filled with a solid color.
-    """
+    """Generate an image filled with a solid color."""
     clr = tuple([int(v*255) for v in fill])
     return Image(SolidColorImagePattern(clr).create_image(width, height).get_texture())
 
+
 def gradient(width, height, clr1=(0,0,0,1), clr2=(1,1,1,1), type=LINEAR):
-    """ Generates a gradient image and returns it.
-        - width : the width of the image.
-        - height: the height of the image.
-        - clr1  : a Color (or a tuple) that defines the bottom (or inner) color.
-        - clr2  : a Color (or a tuple) that defines the top (or outer) color.
-        - type  : either LINEAR or RADIAL.
+    """Generate a gradient image and return it.
+
+    - width : the width of the image.
+    - height: the height of the image.
+    - clr1  : a Color (or a tuple) that defines the bottom (or inner) color.
+    - clr2  : a Color (or a tuple) that defines the top (or outer) color.
+    - type  : either LINEAR or RADIAL.
+
     """
     f = type==LINEAR and LinearGradient or RadialGradient
     img = Image(_texture(ceil2(width), ceil2(height)))
     img = filter(img, f(img.texture, vec4(*clr1), vec4(*clr2)))
+
     # Reuse main _buffer when possible, otherwise create one on the fly
     # (this will be necessary when filter() or render() is nested inside render()).
     if not _buffer or _buffer.active:
         buffer = OffscreenBuffer(img.texture.width, img.texture.height)
     else:
         buffer = _buffer
+
     # If the given dimensions are not power of 2,
     # scale down the gradient to the given dimensions.
     if width != img.width or height != img.height:
@@ -1241,60 +1507,90 @@ def gradient(width, height, clr1=(0,0,0,1), clr2=(1,1,1,1), type=LINEAR):
         img.draw()
         buffer.pop()
         return img.copy(texture=buffer.texture)
+
     return img
 
+
 def colorize(img, color=(1,1,1,1), bias=(0,0,0,0)):
-    """ Applies a colorize filter to the image and returns the colorized image.
-        - color: a Color (or a tuple) of RGBA-values to multiply with each image pixel.
-        - bias : a Color (or a tuple) of RGBA-values to add to each image pixel.
+    """Apply a colorize filter to the image and return the colorized image.
+
+    - color: a Color (or a tuple) of RGBA-values to multiply with each image pixel.
+    - bias : a Color (or a tuple) of RGBA-values to add to each image pixel.
+
     """
     return filter(img, Colorize(img.texture, vec4(*color), vec4(*bias)))
 
+
 def adjust(img, brightness=1.0, contrast=1.0, saturation=1.0, hue=0.0):
-    """ Applies color adjustment filters to the image and returns the adjusted image.
-        - brightness: the overall lightness or darkness (0.0 is a black image).
-        - contrast  : the difference in brightness between regions.
-        - saturation: the intensity of the colors (0.0 is a grayscale image).
-        - hue       : the shift in hue (1.0 is 360 degrees on the color wheel).
+    """Apply color adjustment filters to image and return the adjusted image.
+
+    - brightness: the overall lightness or darkness (0.0 is a black image).
+    - contrast  : the difference in brightness between regions.
+    - saturation: the intensity of the colors (0.0 is a grayscale image).
+    - hue       : the shift in hue (1.0 is 360 degrees on the color wheel).
+
     """
-    if brightness != 1: img = filter(img, BrightnessAdjustment(img.texture, brightness))
-    if contrast   != 1: img = filter(img, ContrastAdjustment(img.texture, contrast))
-    if saturation != 1: img = filter(img, SaturationAdjustment(img.texture, saturation))
-    if hue        != 0: img = filter(img, HueAdjustment(img.texture, hue))
+    if brightness != 1:
+        img = filter(img, BrightnessAdjustment(img.texture, brightness))
+
+    if contrast != 1:
+        img = filter(img, ContrastAdjustment(img.texture, contrast))
+
+    if saturation != 1:
+        img = filter(img, SaturationAdjustment(img.texture, saturation))
+
+    if hue != 0:
+        img = filter(img, HueAdjustment(img.texture, hue))
+
     return img
 
+
 def desaturate(img):
-    """ Returns a grayscale version of the image.
-    """
+    """Return a grayscale version of the image."""
     return filter(img, SaturationAdjustment(img.texture, 0.0))
+
 
 grayscale = desaturate
 
+
 def brightpass(img, threshold=0.3):
-    """ Applies a bright pass filter, where pixels whose luminance falls below the threshold are black.
+    """Apply a bright pass filter an return it.
+
+    Pixels whose luminance falls below the threshold become black.
+
     """
     return filter(img, BrightPass(img.texture, threshold))
 
+
 def blur(img, kernel=5, scale=1.0, amount=1, cumulative=False):
-    """ Applies a blur filter to the image and returns the blurred image.
-        - kernel: the size of the convolution matrix (e.g. 9 = 9x9 convolution kernel).
-        - scale : the radius of the effect, a higher scale will create a rougher but faster blur.
-        - amount: the number of the times to apply the blur filter;
-                  because blurred layers are pasted on top of each other cumulatively
-                  this produces a nicer effect than repeatedly using blur() in a for-loop
-                  (which blurs the blurred).
+    """Apply a blur filter to the image and returns the blurred image.
+
+    - kernel: the size of the convolution matrix (e.g. 9 = 9x9 convolution
+              kernel).
+    - scale : the radius of the effect, a higher scale will create a rougher
+              but faster blur.
+    - amount: the number of the times to apply the blur filter; because blurred
+              layers are pasted on top of each other cumulatively, this
+              produces a nicer effect than repeatedly using blur() in a
+              for-loop (which blurs the blurred image).
+
     """
     for i in range(amount):
         clear = i==0 or not cumulative
         img = filter(img, HorizontalBlur(img.texture, kernel, scale), clear=clear)
         img = filter(img, VerticalBlur(img.texture, kernel, scale), clear=clear)
+
     return img
 
+
 def transparent(img, alpha=1.0):
-    """ Returns a transparent version of the image.
-        - alpha: the percentage of the original opacity of the image (0.0-1.0).
+    """Return a transparent version of the image.
+
+    - alpha: the percentage of the original opacity of the image (0.0-1.0).
+
     """
     return filter(img, AlphaTransparency(img.texture, alpha))
+
 
 def _q(img):
     # For images functioning as masks or blend layers,
@@ -1303,69 +1599,107 @@ def _q(img):
         return filter(img)
     return img
 
+
 def mask(img1, img2, alpha=1.0, dx=0, dy=0):
-    """ Applies the second image as an alpha mask to the first image.
-        The second image must be a grayscale image, where the black areas
-        make the first image transparent (e.g. punch holes in it).
-        - dx: horizontal offset (in pixels) of the alpha mask.
-        - dy: vertical offset (in pixels) of the alpha mask.
+    """Apply the second image as an alpha mask to the first image.
+
+    The second image must be a grayscale image, where the black areas make the
+    first image transparent (e.g. punch holes in it).
+
+    - dx: horizontal offset (in pixels) of the alpha mask.
+    - dy: vertical offset (in pixels) of the alpha mask.
+
     """
     return filter(img1, AlphaMask(img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def blend(img1, img2, mode=OVERLAY, alpha=1.0, dx=0, dy=0):
-    """ Applies the second image as a blend layer with the first image.
-        - dx: horizontal offset (in pixels) of the blend layer.
-        - dy: vertical offset (in pixels) of the blend layer.
+    """Apply the second image as a blend layer with the first image.
+
+    - dx: horizontal offset (in pixels) of the blend layer.
+    - dy: vertical offset (in pixels) of the blend layer.
+
     """
     return filter(img1, Blend(mode, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def add(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode ADD."""
     return filter(img1, Blend(ADD, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def subtract(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode SUBTRACT."""
     return filter(img1, Blend(SUBTRACT, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def lighten(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode LIGHTEN."""
     return filter(img1, Blend(LIGHTEN, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def darken(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode DARKEN."""
     return filter(img1, Blend(DARKEN, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def multiply(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode MULTIPLY."""
     return filter(img1, Blend(MULTIPLY, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def screen(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode SCREEN."""
     return filter(img1, Blend(SCREEN, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def overlay(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode OVERLAY."""
     return filter(img1, Blend(OVERLAY, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def hardlight(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode HARDLIGHT."""
     return filter(img1, Blend(HARDLIGHT, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def hue(img1, img2, alpha=1.0, dx=0, dy=0):
+    """Blend second image with first with mode HUE."""
     return filter(img1, Blend(HUE, img1.texture, _q(img2).texture, alpha, dx, dy))
 
+
 def glow(img, intensity=0.5, amount=1):
-    """ Returns the image blended with a blurred version, yielding a glowing effect.
-        - intensity: the opacity of the blur (0.0-1.0).
-        - amount   : the number of times to blur.
+    """Return the image blended with a glowing effect applied.
+
+    This is achieved by blending the image with a blurred version of itself.
+
+    - intensity: the opacity of the blur (0.0-1.0).
+    - amount   : the number of times to blur.
+
     """
     b = blur(img, kernel=9, scale=1.0, amount=max(1, amount))
     return add(img, b, alpha=intensity)
 
+
 def bloom(img, intensity=0.5, amount=1, threshold=0.3):
-    """ Returns the image blended with a blurred brightpass version, yielding a "magic glow" effect.
-        - intensity: the opacity of the blur (0.0-1.0).
-        - amount   : the number of times to blur.
-        - threshold: the luminance threshold of pixels that light up.
+    """Return the image with "magic glow" effect applied.
+
+    This is achieved by blending the image with a blurred brightpass version of
+    itself.
+
+    - intensity: the opacity of the blur (0.0-1.0).
+    - amount   : the number of times to blur.
+    - threshold: the luminance threshold of pixels that light up.
+
     """
     b = brightpass(img, threshold)
     b = blur(img, kernel=9, scale=1.0, amount=max(1, amount))
     return add(img, b, alpha=intensity)
 
-def distortion_mixin(type, dx, dy, **kwargs):
-    # Each distortion filter has specific parameters to tweak the effect (usually radius and zoom).
+
+def _distortion_mixin(type, dx, dy, **kwargs):
+    # Each distortion filter has specific parameters to tweak the effect
+    # (usually radius and zoom).
     # Returns the magnitude m and intensity i from the keyword arguments,
     # which are the parameters expected by the Distortion Filter class.
     if type == BUMP:
@@ -1394,104 +1728,134 @@ def distortion_mixin(type, dx, dy, **kwargs):
     else:
         m = 0.5
         i = 0.5
+
     return dx, dy, m, i
 
-#def bump(img, dx=0.5, dy=0.5, radius=0.5, zoom=0.5)
+
+# def bump(img, dx=0.5, dy=0.5, radius=0.5, zoom=0.5)
 def bump(img, dx=0.5, dy=0.5, **kwargs):
-    """ Returns the image with a bump distortion applied to it.
-        - dx: horizontal origin of the effect, between 0.0 and 1.0.
-        - dy: vertical origin of the effect, between 0.0 and 1.0.
-        - radius: the radius of the affected area, proportional to the image size.
-        - zoom: the amount to zoom in.
+    """Return the image with a bump distortion applied to it.
+
+    - dx: horizontal origin of the effect, between 0.0 and 1.0.
+    - dy: vertical origin of the effect, between 0.0 and 1.0.
+    - radius: the radius of the affected area, proportional to the image size.
+    - zoom: the amount to zoom in.
+
     """
-    dx, dy, m, i = distortion_mixin(BUMP, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(BUMP, dx, dy, **kwargs)
     return filter(img, filter=Distortion(BUMP, img.texture, dx-0.5, dy-0.5, m, i))
 
-#def dent(img, dx=0.5, dy=0.5, radius=0.5, zoom=0.5)
+
+# def dent(img, dx=0.5, dy=0.5, radius=0.5, zoom=0.5)
 def dent(img, dx=0.5, dy=0.5, **kwargs):
-    """ Returns the image with a dent distortion applied to it.
-        - dx: horizontal origin of the effect, between 0.0 and 1.0.
-        - dy: vertical origin of the effect, between 0.0 and 1.0.
-        - radius: the radius of the affected area, proportional to the image size.
-        - zoom: the amount to zoom in.
+    """Return the image with a dent distortion applied to it.
+
+    - dx: horizontal origin of the effect, between 0.0 and 1.0.
+    - dy: vertical origin of the effect, between 0.0 and 1.0.
+    - radius: the radius of the affected area, proportional to the image size.
+    - zoom: the amount to zoom in.
+
     """
-    dx, dy, m, i = distortion_mixin(DENT, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(DENT, dx, dy, **kwargs)
     return filter(img, filter=Distortion(DENT, img.texture, dx-0.5, dy-0.5, m, i))
 
-#def pinch(img, dx=0.5, dy=0.5, zoom=0.75)
+
+# def pinch(img, dx=0.5, dy=0.5, zoom=0.75)
 def pinch(img, dx=0.5, dy=0.5, **kwargs):
-    """ Returns the image with a pinch distortion applied to it.
-        - dx: horizontal origin of the effect, between 0.0 and 1.0.
-        - dy: vertical origin of the effect, between 0.0 and 1.0.
-        - zoom: the amount of bulge (0.1-0.5) or pinch (0.5-1.0):
+    """Return the image with a pinch distortion applied to it.
+
+    - dx: horizontal origin of the effect, between 0.0 and 1.0.
+    - dy: vertical origin of the effect, between 0.0 and 1.0.
+    - zoom: the amount of bulge (0.1-0.5) or pinch (0.5-1.0):
+
     """
-    dx, dy, m, i = distortion_mixin(PINCH, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(PINCH, dx, dy, **kwargs)
     return filter(img, filter=Distortion(PINCH, img.texture, dx-0.5, dy-0.5, m, i))
+
 
 #def twirl(img, dx=0.5, dy=0.5, radius=1.0, angle=180.0)
 def twirl(img, dx=0.5, dy=0.5, **kwargs):
-    """ Returns the image with a twirl distortion applied to it.
-        - dx: horizontal origin of the effect, between 0.0 and 1.0.
-        - dy: vertical origin of the effect, between 0.0 and 1.0.
-        - radius: the radius of the effect, proportional to the image size.
-        - angle: the amount of rotation in degrees.
+    """Return the image with a twirl distortion applied to it.
+
+    - dx: horizontal origin of the effect, between 0.0 and 1.0.
+    - dy: vertical origin of the effect, between 0.0 and 1.0.
+    - radius: the radius of the effect, proportional to the image size.
+    - angle: the amount of rotation in degrees.
+
     """
-    dx, dy, m, i = distortion_mixin(TWIRL, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(TWIRL, dx, dy, **kwargs)
     return filter(img, filter=Distortion(TWIRL, img.texture, dx-0.5, dy-0.5, m, i))
+
 
 #def splash(img, dx=0.5, dy=0.5, radius=0.5)
 def splash(img, dx=0.5, dy=0.5, **kwargs):
-    """ Returns the image with a light-tunnel distortion applied to it.
-        - dx: horizontal origin of the effect, between 0.0 and 1.0.
-        - dy: vertical origin of the effect, between 0.0 and 1.0.
-        - radius: the radius of the unaffected area, proportional to the image size.
+    """Return the image with a light-tunnel distortion applied to it.
+
+    - dx: horizontal origin of the effect, between 0.0 and 1.0.
+    - dy: vertical origin of the effect, between 0.0 and 1.0.
+    - radius: the radius of the unaffected area, proportional to the image size.
+
     """
-    dx, dy, m, i = distortion_mixin(SPLASH, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(SPLASH, dx, dy, **kwargs)
     return filter(img, filter=Distortion(SPLASH, img.texture, dx-0.5, dy-0.5, m, i))
+
 
 #def stretch(img, dx=0.5, dy=0.5, radius=0.5, zoom=1.0)
 def stretch(img, dx=0.5, dy=0.5, **kwargs):
-    """ Returns the image with a zoom box distortion applied to it.
-        - dx: horizontal origin of the effect, between 0.0 and 1.0.
-        - dy: vertical origin of the effect, between 0.0 and 1.0.
-        - radius: the radius of the affected area, proportional to the image size.
-        - zoom: the amount to zoom in (0.0-2.0, where 1.0 means 1x zoomed in, or 200%).
+    """Return the image with a zoom box distortion applied to it.
+
+    - dx: horizontal origin of the effect, between 0.0 and 1.0.
+    - dy: vertical origin of the effect, between 0.0 and 1.0.
+    - radius: the radius of the affected area, proportional to the image size.
+    - zoom: amount to zoom in (0.0-2.0, where 1.0 means 1x zoomed in, or 200%).
+
     """
-    dx, dy, m, i = distortion_mixin(STRETCH, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(STRETCH, dx, dy, **kwargs)
     return filter(img, filter=Distortion(STRETCH, img.texture, dx-0.5, dy-0.5, m, i))
+
 
 #def mirror(img, dx=0.5, dy=0.5, horizontal=True, vertical=True)
 def mirror(img, dx=0.5, dy=0.5, **kwargs):
-    """ Returns the image mirrored along horizontal axis dx and vertical axis dy.
-        - dx: horizontal origin of the effect, between 0.0 and 1.0.
-        - dy: vertical origin of the effect, between 0.0 and 1.0.
-        - horizontal: when True, mirrors the image horizontally.
-        - vertical  : when True, mirrors the image vertically.
+    """Return the image mirrored along horizontal axis dx and vertical axis dy.
+
+    - dx: horizontal origin of the effect, between 0.0 and 1.0.
+    - dy: vertical origin of the effect, between 0.0 and 1.0.
+    - horizontal: when True, mirrors the image horizontally.
+    - vertical  : when True, mirrors the image vertically.
+
     """
-    dx, dy, m, i = distortion_mixin(MIRROR, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(MIRROR, dx, dy, **kwargs)
     return filter(img, filter=Distortion(MIRROR, img.texture, dx-0.5, dy-0.5, m, i))
 
+
 def dropshadow(img, alpha=0.5, amount=2, kernel=5):
-    """ Returns a blurred and grayscale version of the image.
-        If filters are not supported, returns a grayscale version without blur (using Image.color).
+    """Return a blurred and grayscale version of the image.
+
+    If filters are not supported, returns a grayscale version without blur
+    (using Image.color).
+
     """
     if not SUPPORTED:
         t = texture(img)
     else:
         t = blur(img, kernel=kernel, amount=amount).texture
+
     img = isinstance(img, Image) and img.copy(t) or Image(t)
     img.color.rgba = (0,0,0, alpha)
     return img
 
-#--- ONSCREEN FILTERS --------------------------------------------------------------------------------
+
+# -- ONSCREEN FILTERS ---------------------------------------------------------
 # These can be used directly as filter parameter for the image() command.
 # This may be faster because no offscreen buffer is used to render the effect.
 
 def inverted():
     return Invert(None)
 
+
 def colorized(color=(1,1,1,1), bias=(0,0,0,0)):
     return Colorize(None, vec4(*color), vec4(*bias))
+
 
 def adjusted(mode, v):
     if mode == BRIGHTNESS:
@@ -1503,18 +1867,23 @@ def adjusted(mode, v):
     if mode == HUE:
         return HueAdjustment(None, v)
 
+
 def desaturated():
     return SaturationAdjustment(None, 0.0)
+
 
 def blurred(scale=1.0):
     return Gaussian3x3Blur(None, scale)
 
+
 def masked(img, alpha=1.0, dx=0, dy=0):
     return AlphaMask(None, _q(img).texture, alpha, dx, dy)
+
 
 def blended(mode, img, alpha=1.0, dx=0, dy=0):
     return Blend(mode, None, _q(img).texture, alpha, dx, dy)
 
+
 def distorted(type, dx=0.5, dy=0.5, **kwargs):
-    dx, dy, m, i = distortion_mixin(type, dx, dy, **kwargs)
+    dx, dy, m, i = _distortion_mixin(type, dx, dy, **kwargs)
     return Distortion(type, None, dx-0.5, dy-0.5, m, i)
