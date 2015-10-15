@@ -741,6 +741,8 @@ class Text(object):
 _TEXT_CACHE = 200
 _text_cache = {}
 _text_queue = []
+
+
 def text(str, x=None, y=None, width=None, height=None, draw=True, **kwargs):
     """Draw the string at the given position, with the current font().
 
@@ -750,7 +752,7 @@ def text(str, x=None, y=None, width=None, height=None, draw=True, **kwargs):
     be applied.
 
     """
-    if isinstance(str, Text) and width is None and height is None and len(kwargs) == 0:
+    if all((isinstance(str, Text), width is None, height is None, not kwargs)):
         txt = str
     else:
         # If the given text is not a Text object, create one on the fly.
@@ -781,8 +783,7 @@ def text(str, x=None, y=None, width=None, height=None, draw=True, **kwargs):
 
         if not recycled:
             txt = Text(str, x or 0, y or 0, width, height, **kwargs)
-            _text_cache.setdefault(id, [])
-            _text_cache[id].append(txt)
+            _text_cache.setdefault(id, []).append(txt)
             _text_queue.insert(0, id)
 
             for id in reversed(_text_queue[_TEXT_CACHE:]):
@@ -1984,7 +1985,7 @@ class Mouse(Point):
 
     @cursor.setter
     def cursor(self, mode):
-        self._cursor = mode != DEFAULT and mode or None
+        self._cursor = mode if mode != DEFAULT else None
 
         if mode == HIDDEN:
             self._canvas._window.set_mouse_visible(False)
