@@ -69,7 +69,7 @@ __all__ = (
     'curveto',
     'directed',
     'drawpath',
-    'endclip'
+    'endclip',
     'endpath',
     'findpath',
     'insert_point',
