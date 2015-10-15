@@ -18,17 +18,18 @@ from .color import Color
 from .state import global_state as _g
 
 __all__ = (
-    'image',
+    'Image',
     'ImageError',
-    'Quad',
     'Pixels',
+    'Quad',
     'cache',
     'cached',
     'crop',
     'image',
+    'image',
     'imagesize',
     'pixels',
-    'texture',
+    'texture'
 )
 
 _IMAGE_CACHE = 200
