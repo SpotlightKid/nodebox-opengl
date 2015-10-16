@@ -34,7 +34,7 @@ class Action(object):
     def setup(*args, **kwargs):
         """Do set up for action.
 
-        Gets called by __init__ with all the parameteres received,
+        Gets called by __init__ with all the parameteres received.
 
         At this time the target for the action is unknown.
         Typical use is store parameters needed by the action.
@@ -60,7 +60,7 @@ class Action(object):
         """
         self.target = None
 
-    def update(self, dt):
+    def update(self, dt=0.):
         """Advance the action state.
 
         Gets called every frame. `dt` is the time in seconds (float) that
@@ -87,23 +87,23 @@ class IntervalAction(Action):
     expresses the changes to target as a function of the time elapsed.
 
     """
-    def update(self, dt):
+    def update(self, dt=0.):
         self._elapsed += dt
         self.advance(self._elapsed)
 
     def advance(self, t):
         """Gets called every time the action should advance one step.
 
-        't' is the time elapsed normalized to [0, 1]
+        't' is the time elapsed since update() was called the first time.
 
-        If this action takes 5 seconds to execute, `t` will be equal to 0
-        at 0 seconds. `t` will be 0.5 at 2.5 seconds and `t` will be 1 at 5sec.
+        Overwrite this in your concrete interval action class.
 
         """
         pass
 
     @property
     def done(self):
+        """Action is done when the interval duration has elasped."""
         return self._elapsed >= self.duration
 
 
@@ -111,11 +111,41 @@ class SetAttributeAction(IntervalAction):
     """Changes an attribute of the target until a destination value is reached.
     """
 
-    def setup(self, attr, destval=1.0, duration=1.0, tween=ease_linear):
+    def setup(self, attr, destval=1.0, duration=1.0, tween=ease_linear,
+              clamp=False):
+        """Initialize the action parameters.
+
+        ``attr`` is the attribute of the action target to change over time.
+        ``destval`` (default ``1.0``) is the destination value of this
+        attribute that should be reached at the end of ``duration`` (in
+        seconds, default ``1.0``).
+
+        The default curve of the intermediate values is linear. You can specify
+        a different tweening function with the ``tween`` keyword argument
+        (default ``ease_linear``). The ``nodebox.animation.tween`` module
+        provides a wide variety of tweening functions for differently weighted
+        curves. If you want to provide your own custom tweening function, it
+        needs to accept four parameters:
+
+        * ``t`` - time elapsed (in seconds) going from zero to ``d``
+        * ``b`` - start value
+        * ``c`` - value change, i.e. ``destination value - start value``
+        * ``d`` - total duration (in seconds)
+
+        The function must return the intermediate value at time ``t``.
+
+        If ``clamp`` is set to ``True`` all values are pinned between the start
+        and the destination value, i.e. if the tweening function returns a
+        value higher than the destination value, it is replaced by the latter
+        and if it returns a value lower than the start value, the start value
+        is used.
+
+        """
         self.attr = attr
         self.destval = destval
         self.duration = duration
         self.tween = tween
+        self.clamp = clamp
 
     def start(self):
         self.startval = getattr(self.target, self.attr)
@@ -123,10 +153,11 @@ class SetAttributeAction(IntervalAction):
 
     def advance(self, t):
         try:
-            value = clamp(
-                self.tween(t, self.startval, self.interval, self.duration),
-                self.startval,
-                self.destval)
+            value = (self.destval if self.done else
+                    self.tween(t, self.startval, self.interval, self.duration))
+
+            if self.clamp:
+                value = clamp(value, self.startval, self.destval)
         except ZeroDivisionError:
             value = self.destval
 
@@ -156,7 +187,13 @@ class Actionable(object):
 
         self._to_remove.add(action)
 
-    def update(self, dt):
+    def update(self, dt=None):
+        if dt is None:
+            try:
+                dt = self.canvas.elapsed
+            except AttributeError:
+                dt = 0
+
         if not hasattr(self, '_to_remove'):
             self._to_remove = set([])
 
@@ -168,6 +205,15 @@ class Actionable(object):
 
             if action.done:
                 self.remove_action(action)
+
+    @property
+    def done(self):
+        """Return True when all transitions have finished."""
+        for action in getattr(self, '_actions', set([])):
+            if not action.done:
+                return False
+        else:
+            return True
 
 
 def test(n=100.0):
