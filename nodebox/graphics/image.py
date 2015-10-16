@@ -126,7 +126,7 @@ def cached(texture):
     return None
 
 
-def _render(texture, quad=(0,0,0,0,0,0,0,0)):
+def _render(texture, quad=None):
     """Render the texture on the canvas inside a quadtriliteral (rectangle).
 
     The quadriliteral can be distorted by giving corner offset coordinates.
@@ -135,14 +135,18 @@ def _render(texture, quad=(0,0,0,0,0,0,0,0)):
     t = texture.tex_coords # power-2 dimensions
     w = texture.width      # See Pyglet programming guide -> OpenGL imaging.
     h = texture.height
-    dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4 = quad or (0,0,0,0,0,0,0,0)
+    dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4 = quad or (0, 0, 0, 0, 0, 0, 0, 0)
     glEnable(texture.target)
     glBindTexture(texture.target, texture.id)
     glBegin(GL_QUADS)
-    glTexCoord3f(t[0], t[1],  t[2] ); glVertex3f(dx4,   dy4,   0)
-    glTexCoord3f(t[3], t[4],  t[5] ); glVertex3f(dx3+w, dy3,   0)
-    glTexCoord3f(t[6], t[7],  t[8] ); glVertex3f(dx2+w, dy2+h, 0)
-    glTexCoord3f(t[9], t[10], t[11]); glVertex3f(dx1,   dy1+h, 0)
+    glTexCoord3f(t[0], t[1], t[2] )
+    glVertex3f(dx4, dy4, 0)
+    glTexCoord3f(t[3], t[4], t[5] )
+    glVertex3f(dx3 + w, dy3, 0)
+    glTexCoord3f(t[6], t[7], t[8] )
+    glVertex3f(dx2 + w, dy2 + h, 0)
+    glTexCoord3f(t[9], t[10], t[11])
+    glVertex3f(dx1, dy1 + h, 0)
     glEnd()
     glDisable(texture.target)
 
@@ -349,7 +353,6 @@ class Image(object):
         glTranslatef(x, y, 0)
         glScalef(w, h, 0)
         glColor4f(color[0], color[1], color[2], color[3] * _g.alpha)
-        glColor4f(color[0], color[1], color[2], color[3])
         glCallList(self._cache)
         glPopMatrix()
 
