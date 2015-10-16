@@ -563,6 +563,25 @@ def text(str, x=None, y=None, width=None, height=None, draw=True, **kwargs):
                     break
 
         if not recycled:
+            if isinstance(str, Text):
+                x = str.x if x is None else x
+                y = str.y if y is None else y
+                width = str.width if width is None else width
+                height = str.height if height is None else height
+                opts = dict(
+                    fontname=str.fontname,
+                    fontsize=str.fontsize,
+                    bold=str.bold,
+                    italic=str.italic,
+                    lineheight=str.lineheight,
+                    align=str.align,
+                    fill=str.fill)
+                opts.update(kwargs)
+                kwargs = opts
+                id = (kwargs['fontname'], int(kwargs['fontsize']),
+                      kwargs['bold'], kwargs['italic'])
+                str = str.text
+
             txt = Text(str, x or 0, y or 0, width, height, **kwargs)
             _text_cache.setdefault(id, []).append(txt)
             _text_queue.insert(0, id)
@@ -1052,7 +1071,7 @@ class Layer(list, Prototype, EventHandler):
         self._clipping_mask = LayerClippingMask(self)
 
     @classmethod
-    def from_image(self, img, *args, **kwargs):
+    def from_image(cls, img, *args, **kwargs):
         """Return a new layer that renders the given image.
 
         The layer will have the same size as the image.
@@ -1069,13 +1088,13 @@ class Layer(list, Prototype, EventHandler):
         def draw(layer):
             image(layer.image)
 
-        layer = self(*args, **kwargs)
+        layer = cls(*args, **kwargs)
         layer.set_method(draw)
         layer.set_property("image", img)
         return layer
 
     @classmethod
-    def from_function(self, function, *args, **kwargs):
+    def from_function(cls, function, *args, **kwargs):
         """Return a new layer that renders the drawing commands in the given function.
 
         The layer's draw() method is set.
@@ -1084,7 +1103,7 @@ class Layer(list, Prototype, EventHandler):
         def draw(layer):
             function(layer)
 
-        layer = self(*args, **kwargs)
+        layer = cls(*args, **kwargs)
         layer.set_method(draw)
         return layer
 
@@ -1147,8 +1166,10 @@ class Layer(list, Prototype, EventHandler):
         # Append the layer to the new container.
         if self in (self.__dict__.get(key) or ()):
             self.__dict__[key].remove(self)
+
         if isinstance(value, list) and self not in value:
             list.append(value, self)
+
         self.__dict__[key] = value
 
     @property
@@ -1235,11 +1256,11 @@ class Layer(list, Prototype, EventHandler):
     height = property(_get_height, _set_height)
 
     @property
-    def scale(self):
+    def scaling(self):
         return self._scale.get()
 
-    @scale.setter
-    def scale(self, val):
+    @scaling.setter
+    def scaling(self, val):
         self._transform_cache = None
         self._scale.set(val, self.duration)
 
@@ -1564,6 +1585,7 @@ class Layer(list, Prototype, EventHandler):
                 layer._transform_stack = None
 
             self.traverse(_flush)
+
         if not local:
             # Return the cumulative transformation matrix.
             # All of the parent transformation states need to be up to date.
@@ -1659,6 +1681,7 @@ class Layer(list, Prototype, EventHandler):
     def traverse(self, visit=lambda layer: None):
         """Recurse layer structure and calls visit() on each child layer."""
         visit(self)
+
         for layer in self:
             layer.traverse(visit)
 
