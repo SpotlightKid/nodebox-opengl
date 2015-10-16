@@ -40,6 +40,7 @@ from . import geometry as geo
 from .caching import flush, precompile
 from .glext import glLineDash
 from .state import global_state as _g, state_mixin
+from .tessellation import tessellate
 
 
 __all__ = (
@@ -619,7 +620,7 @@ class BezierPath(list):
         def _draw_fill(contours):
             # Drawing commands for the path fill
             # (as triangles by tessellating the contours).
-            v = geo.tesselate(contours)
+            v = tesselate(contours)
             glBegin(GL_TRIANGLES)
 
             for x, y in v:
