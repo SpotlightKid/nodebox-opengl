@@ -192,7 +192,7 @@ class Actionable(object):
             try:
                 dt = self.canvas.elapsed
             except AttributeError:
-                dt = 0
+                dt = 0.
 
         if not hasattr(self, '_to_remove'):
             self._to_remove = set([])
