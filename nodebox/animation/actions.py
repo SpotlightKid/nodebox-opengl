@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+"""Actions encapsulate transformations on the attributes of a target.
+
+They allow, for example, to change a property of a Layer, say its width,
+gradually over a period of time, to achieve animation effects.
+
+The concept is "borrowed" from the cocos2d framework. For now, see their
+documentation on the matter here:
+
+http://python.cocos2d.org/doc/programming_guide/actions.html
+
+"""
 
 from __future__ import absolute_import, print_function, unicode_literals
 
@@ -13,7 +24,7 @@ __all__ = (
     'Action',
     'Actionable',
     'IntervalAction',
-    'SetAttributeAction',
+    'SetAttributesAction',
     'test'
 )
 
@@ -107,7 +118,7 @@ class IntervalAction(Action):
         return self._elapsed >= self.duration
 
 
-class SetAttributeAction(IntervalAction):
+class SetAttributesAction(IntervalAction):
     """Changes an attribute of the target until a destination value is reached.
     """
 
@@ -141,27 +152,37 @@ class SetAttributeAction(IntervalAction):
         is used.
 
         """
-        self.attr = attr
-        self.destval = destval
+        self.attr = attr if isinstance(attr, (tuple, list)) else (attr,)
+        self.destval = (destval if isinstance(destval, (tuple, list))
+                        else (destval,))
         self.duration = duration
         self.tween = tween
         self.clamp = clamp
 
     def start(self):
-        self.startval = getattr(self.target, self.attr)
-        self.interval = self.destval - self.startval
+        self.startval = []
+        self.interval = []
+
+        for i, attr in enumerate(self.attr):
+            startval = getattr(self.target, attr, 0.)
+            self.startval.append(startval)
+            self.interval.append(self.destval[i] - startval)
 
     def advance(self, t):
-        try:
-            value = (self.destval if self.done else
-                    self.tween(t, self.startval, self.interval, self.duration))
+        for i, attr in enumerate(self.attr):
+            try:
+                if self.done:
+                    value = self.destval[i]
+                else:
+                    value = self.tween(t, self.startval[i], self.interval[i],
+                                       self.duration)
 
-            if self.clamp:
-                value = clamp(value, self.startval, self.destval)
-        except ZeroDivisionError:
-            value = self.destval
+                if self.clamp:
+                    value = clamp(value, self.startval[i], self.destval[i])
+            except ZeroDivisionError:
+                value = self.destval[i]
 
-        setattr(self.target, self.attr, value)
+            setattr(self.target, attr, value)
 
 
 class Actionable(object):
