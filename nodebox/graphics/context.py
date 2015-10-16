@@ -42,6 +42,8 @@ from .image import *  # noqa
 from .primitives import *  # noqa
 from .shader import *  # noqa
 from .state import global_state as _g, state_mixin
+from ..animation.actions import Actionable
+from ..animation.tween import ease_linear
 
 
 try:
@@ -72,33 +74,35 @@ class Animation(list):
 
         """
         list.__init__(self, list(images))
-        self.duration = duration # Duration of the entire animation.
-        self.loop = loop     # Loop from last frame to first frame?
-        self._i = -1       # Frame counter.
-        self._t = Transition(0, interpolation=kwargs.get("interpolation", LINEAR))
+        self.duration = duration  # Duration of the entire animation.
+        self.loop = loop          # Loop from last frame to first frame?
+        self._i = -1              # Frame counter.
+        self._t = kwargs.get("interpolation", ease_linear)
+        self._elapsed = 0.0
 
     def copy(self, **kwargs):
-        return Animation(self,
-              duration = kwargs.get("duration", self.duration),
-                  loop = kwargs.get("loop", self.loop),
-         interpolation = self._t._interpolation)
+        return Animation(self, duration=kwargs.get("duration", self.duration),
+                         loop=kwargs.get("loop", self.loop),
+                         interpolation=self._t)
 
-    def update(self):
-        if self.duration is not None:
+    def update(self, dt=0):
+        self._elapsed += dt
+
+        if self.duration:
             # With a duration,
             # skip to a next frame so that the entire animation takes the given time.
-            if self._i < 0 or self.loop and self._i == len(self)-1:
-                self._t.set(0, 0)
-                self._t.update()
-                self._t.set(len(self)-1, self.duration)
-            self._t.update()
-            self._i = int(self._t.current)
+            if self._i < 0 or self.loop and self._i == len(self) - 1:
+                self._elapsed = 0
+
+            self._i = int(round(
+                self._t(self._elapsed, 0, len(self) - 1, self.duration)))
         else:
             # Without a duration,
             # Animation.update() simply moves to the next frame.
             if self._i < 0 or self.loop and self._i == len(self)-1:
                 self._i = -1
-            self._i = min(self._i+1, len(self)-1)
+
+            self._i = min(self._i + 1, len(self) - 1)
 
     @property
     def frames(self):
@@ -107,14 +111,15 @@ class Animation(list):
     @property
     def frame(self):
         # Yields the current frame Image (or None).
-        try: return self[self._i]
+        try:
+            return self[self._i]
         except:
             return None
 
     @property
     def done(self):
         # Yields True when the animation has stopped (or hasn't started).
-        return self.loop is False and self._i == len(self)-1
+        return self.loop is False and self._i == len(self) - 1
 
     def draw(self, *args, **kwargs):
         kwargs['alpha'] = kwargs.get('alpha', 1.0) * _g.alpha
@@ -889,105 +894,6 @@ class EventHandler(object):
     # subclasses of Layer.
 
 
-# =============================================================================
-
-# -- TRANSITION ---------------------------------------------------------------
-# Transition.update() will tween from the last value to transition.set() new
-# value in the given time.
-# Transitions are used as attributes (e.g. position, rotation) for the Layer
-# class.
-
-TIME = 0 # the current time in this frame changes when the canvas is updated
-
-LINEAR = "linear"
-SMOOTH = "smooth"
-
-class Transition(object):
-
-    def __init__(self, value, interpolation=SMOOTH):
-        self._v0 = value # Previous value => Transition.start.
-        self._vi = value # Current value => Transition.current.
-        self._v1 = value # Desired value => Transition.stop.
-        self._t0 = TIME  # Start time.
-        self._t1 = TIME  # End time.
-        self._interpolation = interpolation
-
-    def copy(self):
-        t = Transition(None)
-        t._v0 = self._v0
-        t._vi = self._vi
-        t._v1 = self._v1
-        t._t0 = self._t0
-        t._t1 = self._t1
-        t._interpolation = self._interpolation
-        return t
-
-    def get(self):
-        """Return the transition stop value."""
-        return self._v1
-
-    def set(self, value, duration=1.0):
-        """Set transition stop value.
-
-        The stop value will be reached in the given duration (seconds).
-
-        Calling Transition.update() moves the Transition.current value toward
-        Transition.stop.
-
-        """
-        if not duration:
-            # If no duration is given,
-            # Transition.start = Transition.current = Transition.stop.
-            self._vi = value
-
-        self._v1 = value
-        self._v0 = self._vi
-        self._t0 = TIME # Now.
-        self._t1 = TIME + duration
-
-    @property
-    def start(self):
-        return self._v0
-
-    @property
-    def stop(self):
-        return self._v1
-
-    @property
-    def current(self):
-        return self._vi
-
-    @property
-    def done(self):
-        return TIME >= self._t1
-
-    def update(self):
-        """Calculate the new current value.
-
-        Returns True when done.
-
-        The transition approaches the desired value according to the
-        interpolation:
-
-        - LINEAR: even transition over the given duration time,
-        - SMOOTH: transition goes slower at the beginning and end.
-
-        """
-        if TIME >= self._t1 or self._vi is None:
-            self._vi = self._v1
-            return True
-        else:
-            # Calculate t: the elapsed time as a number between 0.0 and 1.0.
-            t = (TIME - self._t0) / (self._t1 - self._t0)
-
-            if self._interpolation == LINEAR:
-                self._vi = self._v0 + (self._v1-self._v0) * t
-            else:
-                self._vi = (self._v0 + (self._v1 - self._v0) *
-                            geometry.smoothstep(0.0, 1.0, t))
-            return False
-
-
 # -- LAYER --------------------------------------------------------------------
 # The Layer class is responsible for the following:
 # - it has a draw() method to override; all sorts of NodeBox drawing commands
@@ -1020,23 +926,17 @@ class LayerClippingMask(ClippingMask):
         self.layer = layer
 
     def draw(self, fill=(0,0,0,1), stroke=None):
-        w = not self.layer.width  and geometry.INFINITE or self.layer.width
-        h = not self.layer.height and geometry.INFINITE or self.layer.height
+        w = self.layer.width if self.layer.width else geometry.INFINITE
+        h = self.layer.height if self.layer.height else geometry.INFINITE
         rect(0, 0, w, h, fill=fill, stroke=stroke)
 
 
-class Layer(list, Prototype, EventHandler):
+class Layer(list, Actionable, Prototype, EventHandler):
 
-    def __init__(self, x=0, y=0, width=None, height=None, origin=(0,0),
-                 scale=1.0, rotation=0, opacity=1.0, duration=0.0, name=None,
-                 parent=None, **kwargs):
-        """Create a new drawing layer that can be appended to the canvas.
-
-        The duration defines the time (seconds) it takes to animate
-        transformations or opacity. When the animation has terminated,
-        layer.done=True.
-
-        """
+    def __init__(self, x=0, y=0, width=None, height=None, origin=(0, 0),
+                 scale=1.0, rotation=0, opacity=1.0, name=None, parent=None,
+                 **kwargs):
+        """Create a new drawing layer that can be appended to the canvas."""
         if origin == CENTER:
             origin = (0.5, 0.5)
             origin_mode = RELATIVE
@@ -1045,29 +945,28 @@ class Layer(list, Prototype, EventHandler):
         else:
             origin_mode = ABSOLUTE
 
-        Prototype.__init__(self) # Facilitates extension on the fly.
+        Prototype.__init__(self)     # Facilitates extension on the fly.
         EventHandler.__init__(self)
         self._id = _uid()
-        self.name = name                       # Layer name. Layers are accessible as ParentLayer.[name]
-        self.canvas = None                     # The canvas this layer is drawn to.
-        self.parent = parent                   # The layer this layer is a child of.
-        self._x = Transition(x)                # Layer horizontal position in pixels, from the left.
-        self._y = Transition(y)                # Layer vertical position in pixels, from the bottom.
-        self._width = Transition(width)        # Layer width in pixels.
-        self._height = Transition(height)      # Layer height in pixels.
-        self._dx = Transition(origin[0])       # Transformation origin point.
-        self._dy = Transition(origin[1])       # Transformation origin point.
-        self._origin = origin_mode             # Origin point as RELATIVE or ABSOLUTE coordinates?
-        self._scale = Transition(scale)        # Layer width and height scale.
-        self._rotation = Transition(rotation)  # Layer rotation.
-        self._opacity = Transition(opacity)    # Layer opacity.
-        self.duration = duration               # The time it takes to animate transformations.
-        self.top = True                        # Draw on top of or beneath parent?
-        self.flipped = False                   # Flip the layer horizontally?
-        self.clipped = False                   # Clip child layers to bounds?
-        self.hidden = False                    # Hide the layer?
-        self._transform_cache = None           # Cache of the local transformation matrix.
-        self._transform_stack = None           # Cache of the cumulative transformation matrix.
+        self.name = name             # Layer name. Layers are accessible as ParentLayer.[name]
+        self.canvas = None           # The canvas this layer is drawn to.
+        self.parent = parent         # The layer this layer is a child of.
+        self._x = x                  # Layer horizontal position in pixels, from the left.
+        self._y = y                  # Layer vertical position in pixels, from the bottom.
+        self._width = width          # Layer width in pixels.
+        self._height = height        # Layer height in pixels.
+        self._dx = origin[0]         # Transformation origin point.
+        self._dy = origin[1]         # Transformation origin point.
+        self._origin = origin_mode   # Origin point as RELATIVE or ABSOLUTE coordinates?
+        self._scale = scale          # Layer width and height scale.
+        self._rotation = rotation    # Layer rotation.
+        self._opacity = opacity      # Layer opacity.
+        self.top = True              # Draw on top of or beneath parent?
+        self.flipped = False         # Flip the layer horizontally?
+        self.clipped = False         # Clip child layers to bounds?
+        self.hidden = False          # Hide the layer?
+        self._transform_cache = None # Cache of the local transformation matrix.
+        self._transform_stack = None # Cache of the cumulative transformation matrix.
         self._clipping_mask = LayerClippingMask(self)
 
     @classmethod
@@ -1118,22 +1017,20 @@ class Layer(list, Prototype, EventHandler):
         """
         # Create instance of the derived class, not Layer.
         layer = self.__class__()
-        # Copy all transitions instantly.
-        layer.duration = 0
+        # Copy all attributes.
         layer.canvas = canvas
         layer.parent = parent
         layer.name = self.name
-        layer._x = self._x.copy()
-        layer._y = self._y.copy()
-        layer._width = self._width.copy()
-        layer._height = self._height.copy()
+        layer._x = self._x
+        layer._y = self._y
+        layer._width = self._width
+        layer._height = self._height
         layer._origin = self._origin
-        layer._dx = self._dx.copy()
-        layer._dy = self._dy.copy()
-        layer._scale = self._scale.copy()
-        layer._rotation = self._rotation.copy()
-        layer._opacity = self._opacity.copy()
-        layer.duration = self.duration
+        layer._dx = self._dx
+        layer._dy = self._dy
+        layer._scale = self._scale
+        layer._rotation = self._rotation
+        layer._opacity = self._opacity
         layer.top = self.top
         layer.flipped = self.flipped
         layer.clipped = self.clipped
@@ -1190,7 +1087,7 @@ class Layer(list, Prototype, EventHandler):
 
     @property
     def root(self):
-        return self.parent and self.parent.root or self
+        return self.parent.root if self.parent else self
 
     @property
     def layers(self):
@@ -1219,67 +1116,67 @@ class Layer(list, Prototype, EventHandler):
 
     @property
     def x(self):
-        return self._x.get()
+        return self._x
 
     @x.setter
     def x(self, val):
         self._transform_cache = None
-        self._x.set(val, self.duration)
+        self._x = val
 
     @property
     def y(self):
-        return self._y.get()
+        return self._y
 
     @y.setter
     def y(self, val):
         self._transform_cache = None
-        self._y.set(val, self.duration)
+        self._y = val
 
     # Do not use property decorator, because _set_width is used elsewhere
     def _get_width(self):
-        return self._width.get()
+        return self._width
 
     def _set_width(self, val):
         self._transform_cache = None
-        self._width.set(val, self.duration)
+        self._width = val
 
     width = property(_get_width, _set_width)
 
     # Do not use property decorator, because _set_height is used elsewhere
     def _get_height(self):
-        return self._height.get()
+        return self._height
 
     def _set_height(self, val):
         self._transform_cache = None
-        self._height.set(val, self.duration)
+        self._height = val
 
     height = property(_get_height, _set_height)
 
     @property
     def scaling(self):
-        return self._scale.get()
+        return self._scale
 
     @scaling.setter
     def scaling(self, val):
         self._transform_cache = None
-        self._scale.set(val, self.duration)
+        self._scale = val
 
     @property
     def rotation(self):
-        return self._rotation.get()
+        return self._rotation
 
     @rotation.setter
     def rotation(self, val):
         self._transform_cache = None
-        self._rotation.set(val, self.duration)
+        self._rotation = val
 
     @property
     def opacity(self):
-        return self._opacity.get()
+        return self._opacity
 
     @opacity.setter
     def opacity(self, val):
-        self._opacity.set(val, self.duration)
+        self._opacity = val
 
     @property
     def xy(self):
@@ -1306,10 +1203,10 @@ class Layer(list, Prototype, EventHandler):
           from coordinates stored absolute (e.g. what is 200/infinity?).
 
         """
-        dx = self._dx.current
-        dy = self._dy.current
-        w = self._width.current
-        h = self._height.current
+        dx = self._dx
+        dy = self._dy
+        w = self._width
+        h = self._height
 
         # Origin is stored as absolute coordinates and we want it relative.
         if self._origin == ABSOLUTE and relative:
@@ -1323,8 +1220,8 @@ class Layer(list, Prototype, EventHandler):
             dy = dy / h if h != 0 else 0
         # Origin is stored as relative coordinates and we want it absolute.
         elif self._origin == RELATIVE and not relative:
-            dx = w is not None and dx * w or 0
-            dy = h is not None and dy * h or 0
+            dx = dx * w if w is not None else 0
+            dy = dy * h if h is not None else 0
 
         return dx, dy
 
@@ -1337,9 +1234,9 @@ class Layer(list, Prototype, EventHandler):
 
         """
         self._transform_cache = None
-        self._dx.set(x, self.duration)
-        self._dy.set(y, self.duration)
-        self._origin = relative and RELATIVE or ABSOLUTE
+        self._dx
+        self._dy
+        self._origin = RELATIVE if relative else ABSOLUTE
 
     def origin(self, x=None, y=None, relative=False):
         """Set and return the point from which all layer transformations originate.
@@ -1374,8 +1271,8 @@ class Layer(list, Prototype, EventHandler):
         return not self.hidden
 
     @visible.setter
-    def visible(self, b):
-        self.hidden = not b
+    def visible(self, val):
+        self.hidden = not val
 
     def translate(self, x, y):
         self.x += x
@@ -1391,43 +1288,29 @@ class Layer(list, Prototype, EventHandler):
         self.flipped = not self.flipped
 
     def _update(self):
-        """Called each frame by canvas._update() to update layer transitions.
-        """
-        done = self._x.update()
-        done &= self._y.update()
-        done &= self._width.update()
-        done &= self._height.update()
-        done &= self._dx.update()
-        done &= self._dy.update()
-        done &= self._scale.update()
-        done &= self._rotation.update()
+        """Called each frame by canvas._update().
 
-        if not done:  # i.e. the layer is being transformed
+        Calls self.update() and the update() method on all child layers.
+
+        """
+        if not self.done:
+            # i.e. the layer is being transformed
             self._transform_cache = None
 
-        self._opacity.update()
         self.update()
 
         for layer in self:
             layer._update()
 
     def update(self):
-        """Override this method to provide custom updating code."""
-        pass
+        """Override this method to provide custom updating code.
 
-    @property
-    def done(self):
-        """Return True when all transitions have finished."""
-        return all(
-            self._x.done,
-            self._y.done,
-            self._width.done,
-            self._height.done,
-            self._dx.done,
-            self._dy.done,
-            self._scale.done,
-            self._rotation.done,
-            self._opacity.done)
+        Be sure to call super().update() in your overriding method, otherwise
+        actions attached to this layer via the do() method will not get
+        updated (see the Actionable base class).
+
+        """
+        super(Layer, self).update()
 
     def _draw(self):
         """Draw the transformed layer and all of its children."""
@@ -1440,13 +1323,13 @@ class Layer(list, Prototype, EventHandler):
         # translate => flip => rotate => scale => origin.
         # Center the contents around the origin point.
         dx, dy = self.origin(relative=False)
-        glTranslatef(round(self._x.current), round(self._y.current), 0)
+        glTranslatef(round(self._x), round(self._y), 0)
 
         if self.flipped:
             glScalef(-1, 1, 1)
 
-        glRotatef(self._rotation.current, 0, 0, 1)
-        glScalef(self._scale.current, self._scale.current, 1)
+        glRotatef(self._rotation, 0, 0, 1)
+        glScalef(self._scale, self._scale, 1)
 
         # Enable clipping mask if Layer.clipped=True.
         if self.clipped:
@@ -1458,7 +1341,7 @@ class Layer(list, Prototype, EventHandler):
                 layer._draw()
 
         # Draw layer.
-        _g.alpha = self._opacity.current  # XXX should also affect child layers?
+        _g.alpha = self._opacity
         glPushMatrix()
         # Layers are drawn relative from parent origin.
         glTranslatef(-round(dx), -round(dy), 0)
@@ -1530,6 +1413,7 @@ class Layer(list, Prototype, EventHandler):
             # so we hit test them in reverse order (highest-first).
             if not hit:
                 return None
+
             children = [layer for layer in reversed(self) if layer.top is True]
         else:
             # Otherwise, traverse all children in on-top-first order to avoid
@@ -1570,13 +1454,13 @@ class Layer(list, Prototype, EventHandler):
             # translate => flip => rotate => scale => origin.
             tf = Transform()
             dx, dy = self.origin(relative=False)
-            tf.translate(round(self._x.current), round(self._y.current))
+            tf.translate(round(self._x), round(self._y))
 
             if self.flipped:
                 tf.scale(-1, 1)
 
-            tf.rotate(self._rotation.current)
-            tf.scale(self._scale.current, self._scale.current)
+            tf.rotate(self._rotation)
+            tf.scale(self._scale, self._scale)
             tf.translate(-round(dx), -round(dy))
             self._transform_cache = tf
             # Flush the cumulative transformation cache of all children.
@@ -1613,15 +1497,16 @@ class Layer(list, Prototype, EventHandler):
         return self._transform(local=False)
 
     def _bounds(self, local=True):
-        """Return the rectangle that encompasses the transformed layer and its children.
+        """Return the rectangle that encompasses the transformed layer and its
+        children.
 
         If one of the children has width=None or height=None, bounds will be
         infinite.
 
         """
-        w = self._width.current
+        w = self._width
         w = geometry.INFINITE if w is None else w
-        h = self._height.current
+        h = self._height
         h = geometry.INFINITE if h is None else h
         # Find the transformed bounds of the layer:
         p = self.transform.map([(0, 0), (w, 0), (w, h), (0, h)])
@@ -1649,9 +1534,9 @@ class Layer(list, Prototype, EventHandler):
         parent layer) is not rotated or scaled, and has its origin at (0,0).
 
         """
-        w = self._width.current
+        w = self._width
         w = geometry.INFINITE if w is None else w
-        h = self._height.current
+        h = self._height
         h = geometry.INFINITE if h is None else h
 
         if not transformed:
@@ -1665,7 +1550,10 @@ class Layer(list, Prototype, EventHandler):
     hit_test = contains
 
     def absolute_position(self, root=None):
-        """Returns the absolute (x,y) position (i.e. cumulative with parent position).
+        """Returns the absolute (x,y) position of the layer.
+
+        I.e. the absolute position is cumulative with the parent position.
+
         """
         x = 0
         y = 0
@@ -1686,11 +1574,9 @@ class Layer(list, Prototype, EventHandler):
             layer.traverse(visit)
 
     def __repr__(self):
-        return ("Layer(%sx=%.2f, y=%.2f, scale=%.2f, rotation=%.2f, "
-                "opacity=%.2f, duration=%.2f)" %
-                ("name='%s', " % self.name if self.name else "", self.x,
-                 self.y, self.scaling, self.rotation, self.opacity,
-                 self.duration))
+        return ("Layer(name=%s x=%.2f, y=%.2f, scale=%.2f, rotation=%.2f, "
+                "opacity=%.2f)" % (self.name if self.name else "<none>",
+                self.x, self.y, self.scaling, self.rotation, self.opacity))
 
     def __eq__(self, other):
         return isinstance(other, Layer) and self._id == other._id
@@ -1712,8 +1598,8 @@ class Group(Layer):
     """
     def __init__(self, *args, **kwargs):
         Layer.__init__(self, *args, **kwargs)
-        self._set_width(0)
-        self._set_height(0)
+        self._w = 0
+        self._h = 0
 
     @classmethod
     def from_image(*args, **kwargs):
@@ -1740,6 +1626,7 @@ class Group(Layer):
 
             if layer:
                 return layer
+
 
 group = Group
 
