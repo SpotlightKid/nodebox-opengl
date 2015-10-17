@@ -35,8 +35,7 @@ __all__ = (
     'MoveToX',
     'MoveToY',
     'IntervalAction',
-    'SetAttributesAction',
-    'test'
+    'SetAttributesAction'
 )
 
 
@@ -95,6 +94,58 @@ class Action(object):
     def done(self):
         """False while the step method must be called."""
         return self._done
+
+
+class Actionable(object):
+    """Mixin class to add to Layers that can have actions performed on them."""
+
+    def do(self, action):
+        """Add action to perform."""
+        if not hasattr(self, '_actions'):
+            self._actions = set([])
+
+        action = copy.deepcopy(action)
+        self._actions.add(action)
+        action.target = self
+        action.start()
+        return action
+
+    def remove_action(self, action):
+        action.stop()
+        action.target = None
+
+        if not hasattr(self, '_to_remove'):
+            self._to_remove = set([])
+
+        self._to_remove.add(action)
+
+    def update(self, dt=None):
+        if dt is None:
+            try:
+                dt = self.canvas.elapsed
+            except AttributeError:
+                dt = 0.
+
+        if not hasattr(self, '_to_remove'):
+            self._to_remove = set([])
+
+        self._actions = getattr(self, '_actions', set([])) - self._to_remove
+        del self._to_remove
+
+        for action in self._actions:
+            action.update(dt)
+
+            if action.done:
+                self.remove_action(action)
+
+    @property
+    def done(self):
+        """Return True when all transitions have finished."""
+        for action in getattr(self, '_actions', set([])):
+            if not action.done:
+                return False
+        else:
+            return True
 
 
 class IntervalAction(Action):
@@ -253,59 +304,7 @@ MoveByX = partial(SetAttributesAction, 'x', relative=True)
 MoveByY = partial(SetAttributesAction, 'y', relative=True)
 
 
-class Actionable(object):
-    """Mixin class to add to Layers that can have actions performed on them."""
-
-    def do(self, action):
-        """Add action to perform."""
-        if not hasattr(self, '_actions'):
-            self._actions = set([])
-
-        action = copy.deepcopy(action)
-        self._actions.add(action)
-        action.target = self
-        action.start()
-        return action
-
-    def remove_action(self, action):
-        action.stop()
-        action.target = None
-
-        if not hasattr(self, '_to_remove'):
-            self._to_remove = set([])
-
-        self._to_remove.add(action)
-
-    def update(self, dt=None):
-        if dt is None:
-            try:
-                dt = self.canvas.elapsed
-            except AttributeError:
-                dt = 0.
-
-        if not hasattr(self, '_to_remove'):
-            self._to_remove = set([])
-
-        self._actions = getattr(self, '_actions', set([])) - self._to_remove
-        del self._to_remove
-
-        for action in self._actions:
-            action.update(dt)
-
-            if action.done:
-                self.remove_action(action)
-
-    @property
-    def done(self):
-        """Return True when all transitions have finished."""
-        for action in getattr(self, '_actions', set([])):
-            if not action.done:
-                return False
-        else:
-            return True
-
-
-def test(n=100.0):
+def _test(n=100.0):
     a = Actionable()
     a.value = 0
     action = a.do(SetAttributeAction("value", n, 5.0, ease_in_expo))
