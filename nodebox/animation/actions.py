@@ -16,6 +16,8 @@ from __future__ import absolute_import, print_function, unicode_literals
 import copy
 import time
 
+from functools import partial
+
 from .tween import *
 from ..graphics.geometry import clamp
 
@@ -23,6 +25,12 @@ from ..graphics.geometry import clamp
 __all__ = (
     'Action',
     'Actionable',
+    'Fade',
+    'FadeIn',
+    'FadeOut',
+    'MoveTo',
+    'MoveX',
+    'MoveY',
     'IntervalAction',
     'SetAttributesAction',
     'test'
@@ -119,8 +127,7 @@ class IntervalAction(Action):
 
 
 class SetAttributesAction(IntervalAction):
-    """Changes an attribute of the target until a destination value is reached.
-    """
+    """Change one or more attributes of the target over a time interval."""
 
     def setup(self, attr, destval=1.0, duration=1.0, tween=ease_linear,
               clamp=False):
@@ -130,6 +137,11 @@ class SetAttributesAction(IntervalAction):
         ``destval`` (default ``1.0``) is the destination value of this
         attribute that should be reached at the end of ``duration`` (in
         seconds, default ``1.0``).
+
+        Both ``attr`` and ``destval`` can be either a single string resp. value
+        or a tuple or list of values. If several attributes are given,
+        ``destval`` should be a sequence of the same length or a single value,
+        which will then be used as the destination value for each attribute.
 
         The default curve of the intermediate values is linear. You can specify
         a different tweening function with the ``tween`` keyword argument
@@ -153,8 +165,12 @@ class SetAttributesAction(IntervalAction):
 
         """
         self.attr = attr if isinstance(attr, (tuple, list)) else (attr,)
-        self.destval = (destval if isinstance(destval, (tuple, list))
-                        else (destval,))
+
+        if isinstance(destval, (tuple, list)):
+            self.destval = destval
+        else:
+            self.destval = (destval,) * len(self.attr)
+
         self.duration = duration
         self.tween = tween
         self.clamp = clamp
@@ -183,6 +199,43 @@ class SetAttributesAction(IntervalAction):
                 value = self.destval[i]
 
             setattr(self.target, attr, value)
+
+
+class Fade(SetAttributesAction):
+    """Fade the target in or out by modifying its opacity."""
+
+    def setup(self, value, *args, **kwargs):
+        """Fade the target in or out within given duration.
+
+        The resulting opacity must be given as a float between 0.0 and 1.0.
+
+        Duration should be given in seconds as a float and may also be zero
+        for immediately setting the opacity to the destination value.
+
+        """
+        kwargs['clamp'] = True
+        super(Fade, self).setup('opacity', clamp(value), *args, **kwargs)
+
+
+FadeIn = partial(Fade, 1.)
+FadeOut = partial(Fade, 0.)
+
+
+class MoveTo(SetAttributesAction):
+    """Move the action target to a given position."""
+
+    def setup(self, pos=(0, 0), *args, **kwargs):
+        """Move target to pos given a (x, y) tuple within given duration.
+
+        Duration should be given in seconds as a float and may also be zero
+        for immediate placement.
+
+        """
+        super(MoveTo, self).setup(('x', 'y'), pos, *args, **kwargs)
+
+
+MoveX = partial(SetAttributesAction, 'x')
+MoveX = partial(SetAttributesAction, 'x')
 
 
 class Actionable(object):
