@@ -314,7 +314,7 @@ class Delay(IntervalAction):
 
 
 class Fade(SetAttributesAction):
-    """Fade the target in or out by modifying its opacity."""
+    """Fade the target in or out by modifying its opacity attribute."""
 
     def setup(self, value, *args, **kwargs):
         """Fade the target in or out within given duration.
@@ -331,6 +331,28 @@ class Fade(SetAttributesAction):
 
 FadeIn = partial(Fade, 1.)
 FadeOut = partial(Fade, 0.)
+
+
+class Hide(Action):
+    """Hide the target by setting it hidden attribute to True.
+
+    To show it again call the `Show` action.
+
+    """
+    flag = True
+
+    def start(self):
+        self.target.hidden = self.flag
+        self._done = True
+
+
+class Show(Hide):
+    """Hide the target by setting it hidden attribute to False.
+
+    To hide it call the `Hide` action.
+
+    """
+    flag = False
 
 
 class MoveTo(SetAttributesAction):
