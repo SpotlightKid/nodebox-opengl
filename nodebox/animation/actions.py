@@ -156,7 +156,7 @@ class IntervalAction(Action):
     be positive. Degeneratated cases, when a particular instance gets a zero
     duration, are allowed for convenience.
 
-    IntervalAction adds the method ``advance`` to the public interfase, and it
+    IntervalAction adds the method ``advance`` to the public interface, and it
     expresses the changes to target as a function of the time elapsed.
 
     """
@@ -261,7 +261,56 @@ class SetAttributesAction(IntervalAction):
             except ZeroDivisionError:
                 value = self.destval[i]
 
-            setattr(self.target, attr, value)
+            if self.target is not None:
+                setattr(self.target, attr, value)
+
+
+class SequenceAction(Action):
+    """Execute a sequence of actions one after another."""
+
+    def setup(self, *actions):
+        """Set actions and current action to None"""
+        self.actions = actions
+        self.current = None
+
+    def start(self):
+        """Set current action to the first, set its target and start it."""
+        self.current = 0
+        self.actions[self.current].target = self.target
+        self.actions[self.current].start()
+
+    def update(self, dt=0.):
+        if self.current is not None and self.actions[self.current].done:
+            self.actions[self.current].stop()
+            self.current += 1
+
+            if self.current == len(self.actions):
+                self.current = None
+            else:
+                self.actions[self.current].target = self.target
+                self.actions[self.current].start()
+
+        if self.current is not None:
+            self.actions[self.current].update(dt)
+
+    def stop(self):
+        if self.current is not None:
+            self.actions[self.current].stop()
+            self.current = None
+
+        super(SequenceAction, self).stop()
+
+    @property
+    def done(self):
+        return self.current >= len(self.actions) and self.actions[-1].done
+
+
+class Delay(IntervalAction):
+    """Delays the action a certain amount of secondd."""
+
+    def setup(self, delay):
+        """Set delay to given amount in seconds (float or int)."""
+        self.duration = delay
 
 
 class Fade(SetAttributesAction):
@@ -287,14 +336,14 @@ FadeOut = partial(Fade, 0.)
 class MoveTo(SetAttributesAction):
     """Move the action target to a given position."""
 
-    def setup(self, pos=(0, 0), *args, **kwargs):
-        """Move target to pos given a (x, y) tuple within given duration.
+    def setup(self, position=(0, 0), *args, **kwargs):
+        """Move target to given position (x, y) tuple within given duration.
 
         Duration should be given in seconds as a float and may also be zero
         for immediate placement.
 
         """
-        super(MoveTo, self).setup(('x', 'y'), pos, *args, **kwargs)
+        super(MoveTo, self).setup(('x', 'y'), position, *args, **kwargs)
 
 
 MoveToX = partial(SetAttributesAction, 'x')

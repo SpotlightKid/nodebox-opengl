@@ -7,7 +7,8 @@ from __future__ import division, print_function, unicode_literals
 import os, sys; sys.path.insert(0, os.path.join("..", ".."))
 
 from nodebox.graphics import *
-from nodebox.animation.actions import Actionable, Fade, MoveToY, MoveByY
+from nodebox.animation.actions import (Actionable, Fade, MoveToY, MoveByY,
+                                       SequenceAction)
 from nodebox.animation.tween import *
 
 
@@ -45,9 +46,12 @@ class MyCanvas(Canvas):
     def update(self):
         if self.frame == 1:
             self.text.do(Fade(1., 1.5, ease_in_expo))
-            self.text.do(MoveByY(-self.height / 2, 3, ease_out_sine))
-        elif self.frame == 270:
-            self.text.do(MoveToY(-self.text.height, 1.5, ease_in_elastic_small))
+            self.text.do(MoveToY((self.height - self.text.height) / 2, 1.5,
+                                 ease_in_expo))
+        elif self.frame == 180:
+            self.text.do(SequenceAction(MoveByY(300, 1., ease_out_sine),
+                                        MoveToY(-self.text.height, 1.5,
+                                                ease_in_elastic_small)))
         elif self.frame == 400:
             self.stop()
 
@@ -62,7 +66,8 @@ class MyCanvas(Canvas):
 
 
 canvas = MyCanvas()
-aspect = canvas.screen.width / canvas.screen.height
-canvas.size = (1024, int(1024 * (1.0 / aspect)))
+width = min(1024, canvas.screen.width)
+aspect = width / canvas.screen.height
+canvas.size = (width, int(width * (1.0 / aspect)))
 canvas.fullscreen = True
 canvas.run()
