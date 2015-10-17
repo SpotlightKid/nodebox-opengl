@@ -28,9 +28,12 @@ __all__ = (
     'Fade',
     'FadeIn',
     'FadeOut',
+    'MoveBy',
+    'MoveByX',
+    'MoveByY',
     'MoveTo',
-    'MoveX',
-    'MoveY',
+    'MoveToX',
+    'MoveToY',
     'IntervalAction',
     'SetAttributesAction',
     'test'
@@ -130,7 +133,7 @@ class SetAttributesAction(IntervalAction):
     """Change one or more attributes of the target over a time interval."""
 
     def setup(self, attr, destval=1.0, duration=1.0, tween=ease_linear,
-              clamp=False):
+              clamp=False, relative=False):
         """Initialize the action parameters.
 
         ``attr`` is the attribute of the action target to change over time.
@@ -142,6 +145,10 @@ class SetAttributesAction(IntervalAction):
         or a tuple or list of values. If several attributes are given,
         ``destval`` should be a sequence of the same length or a single value,
         which will then be used as the destination value for each attribute.
+
+        If ``relative`` is set to ``True`` (default ``False``), the destination
+        value(s) is (are) not absolute, but relative to the value of the(ir)
+        target attribute at the time of the start of the action.
 
         The default curve of the intermediate values is linear. You can specify
         a different tweening function with the ``tween`` keyword argument
@@ -167,13 +174,14 @@ class SetAttributesAction(IntervalAction):
         self.attr = attr if isinstance(attr, (tuple, list)) else (attr,)
 
         if isinstance(destval, (tuple, list)):
-            self.destval = destval
+            self.destval = list(destval)
         else:
-            self.destval = (destval,) * len(self.attr)
+            self.destval = [destval] * len(self.attr)
 
         self.duration = duration
         self.tween = tween
         self.clamp = clamp
+        self.relative = relative
 
     def start(self):
         self.startval = []
@@ -181,6 +189,10 @@ class SetAttributesAction(IntervalAction):
 
         for i, attr in enumerate(self.attr):
             startval = getattr(self.target, attr, 0.)
+
+            if self.relative:
+                self.destval[i] += startval
+
             self.startval.append(startval)
             self.interval.append(self.destval[i] - startval)
 
@@ -234,8 +246,11 @@ class MoveTo(SetAttributesAction):
         super(MoveTo, self).setup(('x', 'y'), pos, *args, **kwargs)
 
 
-MoveX = partial(SetAttributesAction, 'x')
-MoveX = partial(SetAttributesAction, 'x')
+MoveToX = partial(SetAttributesAction, 'x')
+MoveToY = partial(SetAttributesAction, 'y')
+MoveBy = partial(MoveTo, relative=True)
+MoveByX = partial(SetAttributesAction, 'x', relative=True)
+MoveByY = partial(SetAttributesAction, 'y', relative=True)
 
 
 class Actionable(object):
