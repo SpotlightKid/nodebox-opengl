@@ -212,7 +212,7 @@ class Image(object):
 
     """
     def __init__(self, path, x=0, y=0, width=None, height=None, alpha=1.0,
-                 data=None):
+                 data=None, round_position=False):
         """Create image from file at given path or data."""
         self._src = (path, data)
         self._texture = texture(path, data=data)
@@ -225,6 +225,7 @@ class Image(object):
         self.height = height or self._texture.height
         self.quad = Quad()
         self.color = Color(1.0, 1.0, 1.0, alpha)
+        self.round_position = round_position
 
     def copy(self, texture=None, width=None, height=None):
         img = (self.__class__(self._src[0], data=self._src[1])
@@ -344,8 +345,10 @@ class Image(object):
         # Halo can also be avoided by overpainting in the source image, but
         # this requires some work:
         # http://technology.blurst.com/remove-white-borders-in-transparent-textures/
-        x = round(x)
-        y = round(y)
+        if self.round_position:
+            x = round(x)
+            y = round(y)
+
         w = float(width) / self._texture.width
         h = float(height) / self._texture.height
         # Transform and draw the quads.
