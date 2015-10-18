@@ -355,6 +355,13 @@ class Show(Hide):
     flag = False
 
 
+class ToggleHidden(Action):
+    """Toggle hidden attribute of the target."""
+    def start(self):
+        self.target.hidden = not self.target.hidden
+        self._done = True
+
+
 class MoveTo(SetAttributesAction):
     """Move the action target to a given position."""
 
