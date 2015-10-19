@@ -92,8 +92,11 @@ class Action(object):
 
     @property
     def done(self):
-        """False while the step method must be called."""
+        """False while the update method must be called."""
         return self._done
+
+    def copy(self):
+        return copy.copy(self)
 
 
 class Actionable(object):
@@ -140,7 +143,7 @@ class Actionable(object):
 
     @property
     def done(self):
-        """Return True when all transitions have finished."""
+        """Return True when all actions have finished."""
         for action in getattr(self, '_actions', set([])):
             if not action.done:
                 return False
@@ -270,7 +273,7 @@ class SequenceAction(Action):
 
     def setup(self, *actions):
         """Set actions and current action to None"""
-        self.actions = actions
+        self.actions = [action.copy() for action in actions]
         self.current = None
 
     def start(self):
@@ -284,11 +287,11 @@ class SequenceAction(Action):
             self.actions[self.current].stop()
             self.current += 1
 
-            if self.current == len(self.actions):
-                self.current = None
-            else:
+            if self.current < len(self.actions):
                 self.actions[self.current].target = self.target
                 self.actions[self.current].start()
+            else:
+                self.current = None
 
         if self.current is not None:
             self.actions[self.current].update(dt)
@@ -302,7 +305,34 @@ class SequenceAction(Action):
 
     @property
     def done(self):
-        return self.current >= len(self.actions) and self.actions[-1].done
+        return self.current is None or (self.actions and self.actions[-1].done)
+
+
+class ParallelAction(Action):
+    """Execute a sequence of actions simultaneously."""
+
+    def setup(self, *actions):
+        """Set actions to given iterable"""
+        self.actions = [action.copy() for action in actions]
+
+    def start(self):
+        for action in self.actions:
+            action.target = self.target
+            action.start()
+
+    def update(self, dt=0.):
+        for action in self.actions:
+            if not action.done:
+                action.update(dt)
+
+    def stop(self):
+        for action in self.actions:
+            action.stop()
+            action.target = None
+
+    @property
+    def done(self):
+        return all(action.done for action in self.actions)
 
 
 class Delay(IntervalAction):
