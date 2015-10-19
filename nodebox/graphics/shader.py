@@ -8,7 +8,9 @@
 from __future__ import absolute_import
 
 from ctypes import byref, cast, pointer, POINTER
-from ctypes import c_char, c_char_p, c_uint, c_int
+from ctypes import (c_char, c_char_p, c_float, c_int, c_uint,
+                    create_string_buffer)
+from itertools import chain
 from math import radians
 
 from pyglet.gl import *
@@ -133,11 +135,9 @@ __all__ = (
 _pow2 = [2 ** n for n in range(20)]  # [1, 2, 4, 8, 16, 32, 64, ...]
 
 
-def _next(generator, default=None):
-    try:
-        return generator.next()
-    except StopIteration:
-        return default
+def flatten(i):
+    """Flatten one level of nesting"""
+    return chain.from_iterable(i)
 
 
 def ceil2(x):
@@ -148,7 +148,7 @@ def ceil2(x):
 
 
 def extent2(texture):
-    """Return extent of the image data (0.0-1.0, 0.0-1.0) inside its texture owner.
+    """Return extent of the image data (0.-1., 0.-1.) inside its texture owner.
 
     Textures have a size power of 2 (512, 1024, ...), but the actual image can
     be smaller.
@@ -161,7 +161,7 @@ def extent2(texture):
 
 
 def ratio2(texture1, texture2):
-    """Return size ratio (0.0-1.0, 0.0-1.0) of two texture owners."""
+    """Return size ratio (0. - 1., 0. - 1.) of two texture owners."""
     return (
         float(ceil2(texture1.width)) / ceil2(texture2.width),
         float(ceil2(texture1.height)) / ceil2(texture2.height)
@@ -327,7 +327,7 @@ class Shader(object):
         """Set value of the variable with given name in the GLSL source script.
 
         Supported variable types are: vec2(), vec3(), vec4(), single int/float,
-        list of int/float.
+        list of int/float, list of lists of floats (2x2, 3x3 or 4x4 matrix).
 
         Variables will be initialized when Shader.push() is called (i.e.
         glUseProgram).
@@ -349,14 +349,28 @@ class Shader(object):
                 glUniform3f(address, value[0], value[1], value[2])
             elif len(value) == 4:
                 glUniform4f(address, value[0], value[1], value[2], value[3])
-        # A list representing an array of ints or floats.
+        # A list representing an array of ints or floats or a matrix
         elif isinstance(value, (list, tuple)):
-            if _next((v for v in value if isinstance(v, float))) is not None:
-                array = c_float * len(value)
-                glUniform1fv(address, len(value), array(*value))
-            else:
+            if value and isinstance(value[0], (list, tuple)):
+                # it's a matrix
+                size = len(value)
+                f = {
+                    2: glUniformMatrix2fv,
+                    3: glUniformMatrix3fv,
+                    4: glUniformMatrix4fv
+                }.get(size)
+
+                if f:
+                    array = (c_float * (size * size))(*flatten(value))
+                    f(address, 1, False, array)
+                else:
+                    raise TypeError("Matrices must be 2x2, 3x3 or 4x4 in size.")
+            elif all(isinstance(v, int) for v in value):
                 array = c_int * len(value)
                 glUniform1iv(address, len(value), array(*value))
+            else:
+                array = c_float * len(value)
+                glUniform1fv(address, len(value), array(*value))
         # Single float value.
         elif isinstance(value, float):
             glUniform1f(address, value)
@@ -453,14 +467,15 @@ def shader(vertex=DEFAULT_VERTEX_SHADER, fragment=DEFAULT_FRAGMENT_SHADER,
     """
     global SUPPORTED
 
-    if not silent:
-        return Shader(vertex, fragment)
-
     try:
         return Shader(vertex, fragment)
     except Exception:
-        SUPPORTED = False
-        return ShaderFacade()
+        if silent:
+            SUPPORTED = False
+            return ShaderFacade()
+        else:
+            raise
+
 
 # =============================================================================
 
@@ -1179,20 +1194,21 @@ class Distortion(Filter):
         self.i = i
 
     # Center offset can also be set in absolute coordinates (e.g. pixels):
-    def _get_abs_dx(self):
+    @property
+    def abs_dx(self):
         return int(self.dx * self.texture.width)
 
-    def _get_abs_dy(self):
-        return int(self.dy * self.texture.height)
-
-    def _set_abs_dx(self, v):
+    @abs_dx.setter
+    def abs_dx(self, v):
         self.dx = float(v) / self.texture.width
 
-    def _set_abs_dy(self, v):
-        self.dy = float(v) / self.texture.height
+    @property
+    def abs_dy(self):
+        return int(self.dy * self.texture.height)
 
-    abs_dx = property(_get_abs_dx, _set_abs_dx)
-    abs_dy = property(_get_abs_dy, _set_abs_dy)
+    @abs_dy.setter
+    def abs_dy(self, v):
+        self.dy = float(v) / self.texture.height
 
     def push(self):
         w = float(self.texture.width)
