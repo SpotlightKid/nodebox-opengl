@@ -7,8 +7,8 @@ from __future__ import division, print_function, unicode_literals
 import os, sys; sys.path.insert(0, os.path.join("..", ".."))
 
 from nodebox.graphics import *
-from nodebox.animation.actions import (Actionable, Fade, MoveToY, MoveByY,
-                                       SequenceAction)
+from nodebox.animation.actions import (Actionable, Delay, Fade, MoveToY,
+    MoveByY, ParallelAction, SequenceAction)
 from nodebox.animation.tween import *
 
 
@@ -45,14 +45,17 @@ class MyCanvas(Canvas):
 
     def update(self):
         if self.frame == 1:
-            self.text.do(Fade(1., 1.5, ease_in_expo))
-            self.text.do(MoveToY((self.height - self.text.height) / 2, 1.5,
-                                 ease_in_expo))
-        elif self.frame == 180:
-            self.text.do(SequenceAction(MoveByY(300, 1., ease_out_sine),
-                                        MoveToY(-self.text.height, 1.5,
-                                                ease_in_elastic_small)))
-        elif self.frame == 400:
+            self.text.do(
+                SequenceAction(
+                    ParallelAction(
+                        Fade(1., 1.5, ease_in_expo),
+                        MoveToY((self.height - self.text.height) / 2, 1.5,
+                                 ease_in_expo)),
+                    Delay(2.),
+                    MoveByY(300, 1., ease_out_sine),
+                    MoveToY(-self.text.height, 1.5, ease_in_elastic_small),
+                    Delay(1.)))
+        elif self.text.done:
             self.stop()
 
     def setup(self):
