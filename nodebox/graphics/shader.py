@@ -347,7 +347,7 @@ class Shader(object):
             self._set(name, value)
 
     def _set(self, name, value):
-        if not isinstance(bytes, str) and isinstance(source, string_types):
+        if not isinstance(bytes, str) and isinstance(name, string_types):
             enc_name = name.encode('ascii')
         else:
             enc_name = name
