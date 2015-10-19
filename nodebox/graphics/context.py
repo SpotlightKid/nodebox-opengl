@@ -1774,8 +1774,10 @@ class Keys(list):
 
     def remove(self, code):
         code = self._decode(code)
-        if code in MODIFIERS:
+        try:
             self.modifiers.remove(code)
+        except ValueError:
+            pass
         try:
             list.remove(self, code)
         except ValueError:
@@ -1792,7 +1794,7 @@ class Keys(list):
             s = s.lower()  # "BACKSPACE" => "backspace"
             s = s.lstrip("_")  # "_1" => "1"
             s = s.replace("return", ENTER)  # "return" => "enter"
-            s = s.lstrip("num_")  # "num_space" => "space"
+            s = s[4:] if s.startswith("num_") else s # "num_space" => "space"
             # "lshift" => "shift"
             s = s.lstrip("lr") if s.endswith(MODIFIERS) else s
         return s
