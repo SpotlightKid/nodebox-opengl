@@ -27,7 +27,6 @@ __all__ = (
     'COMPILE',
     'CONTRAST',
     'DARKEN',
-    'DEFAULT',
     'DEFAULT_FRAGMENT_SHADER',
     'DEFAULT_VERTEX_SHADER',
     'DENT',
@@ -130,6 +129,12 @@ __all__ = (
 )
 
 
+try:
+    string_types = (str, unicode)
+except:
+    string_types = (str,)
+
+
 # helper functions
 
 _pow2 = [2 ** n for n in range(20)]  # [1, 2, 4, 8, 16, 32, 64, ...]
@@ -189,7 +194,6 @@ def ratio2(texture1, texture2):
 #      image("box.png", 0, 0)
 #      shader.pop()
 
-DEFAULT = "default"
 DEFAULT_VERTEX_SHADER = """\
 void main() {
     gl_TexCoord[0] = gl_MultiTexCoord0;
@@ -243,11 +247,11 @@ class Shader(object):
     Shader.set().
 
     """
-    def __init__(self, vertex=DEFAULT, fragment=DEFAULT):
-        if vertex == DEFAULT:
+    def __init__(self, vertex=None, fragment=None):
+        if vertex == None:
             vertex = DEFAULT_VERTEX_SHADER
 
-        if fragment == DEFAULT:
+        if fragment == None:
             fragment = DEFAULT_FRAGMENT_SHADER
 
         self._vertex = vertex      # GLSL source for vertex shader.
@@ -266,6 +270,10 @@ class Shader(object):
         # Store the compiled shader so we can delete it later on.
         shader = glCreateShader(type)
         status = c_int(-1)
+
+        if not isinstance(bytes, str) and isinstance(source, string_types):
+            source = source.encode('ascii')
+
         glShaderSource(shader, 1, cast(pointer(c_char_p(source)),
                                        POINTER(POINTER(c_char))), None)
         glCompileShader(shader)
@@ -339,7 +347,12 @@ class Shader(object):
             self._set(name, value)
 
     def _set(self, name, value):
-        address = glGetUniformLocation(self._program, name)
+        if not isinstance(bytes, str) and isinstance(source, string_types):
+            enc_name = name.encode('ascii')
+        else:
+            enc_name = name
+
+        address = glGetUniformLocation(self._program, enc_name)
 
         # A vector with 2, 3 or 4 floats representing vec2, vec3 or vec4.
         if isinstance(value, vector):
@@ -378,8 +391,8 @@ class Shader(object):
         elif isinstance(value, int):
             glUniform1i(address, value)
         else:
-            ShaderError("don't know how to handle variable %s" %
-                        value.__class__)
+            ShaderError("Don't know how to handle type %s for variable '%s'." %
+                        (type(value), name))
 
     def push(self):
         """Install the program and sets its variables.
@@ -453,8 +466,7 @@ class ShaderFacade:
         pass
 
 
-def shader(vertex=DEFAULT_VERTEX_SHADER, fragment=DEFAULT_FRAGMENT_SHADER,
-           silent=True):
+def shader(vertex=None, fragment=None, silent=True):
     """Return a compiled Shader from the given GLSL source code.
 
     With silent=True, never raises an error but instead returns a ShaderFacade.
