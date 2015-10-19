@@ -48,7 +48,7 @@ class MyCanvas(Canvas):
             self.text.do(
                 SequenceAction(
                     ParallelAction(
-                        Fade(1., 1.5, ease_in_expo),
+                        Fade(1., 2.3, ease_in_expo),
                         MoveToY((self.height - self.text.height) / 2, 1.5,
                                  ease_in_expo)),
                     Delay(2.),
