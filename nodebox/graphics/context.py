@@ -1132,7 +1132,7 @@ class Layer(list, Actionable, Prototype, EventHandler):
         self._transform_cache = None
         self._y = val
 
-    # Do not use property decorator, because _set_width is used elsewhere
+    # Do not use property decorator, _set_width is needed in gui.controls
     def _get_width(self):
         return self._width
 
@@ -1142,7 +1142,7 @@ class Layer(list, Actionable, Prototype, EventHandler):
 
     width = property(_get_width, _set_width)
 
-    # Do not use property decorator, because _set_height is used elsewhere
+    # Do not use property decorator, _set_height is needed in gui.controls
     def _get_height(self):
         return self._height
 
