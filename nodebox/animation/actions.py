@@ -25,17 +25,25 @@ from ..graphics.geometry import clamp
 __all__ = (
     'Action',
     'Actionable',
+    'ChangeAttributesAction',
+    'Delay',
     'Fade',
     'FadeIn',
     'FadeOut',
+    'Hide',
+    'IntervalAction',
     'MoveBy',
     'MoveByX',
     'MoveByY',
     'MoveTo',
     'MoveToX',
     'MoveToY',
-    'IntervalAction',
-    'SetAttributesAction'
+    'ParallelAction',
+    'RepeatAction',
+    'SequenceAction',
+    'SetAttributesAction',
+    'Show',
+    'ToggleHidden'
 )
 
 
@@ -96,7 +104,7 @@ class Action(object):
         return self._done
 
     def copy(self):
-        return copy.copy(self)
+        return copy.deepcopy(self)
 
 
 class Actionable(object):
@@ -107,7 +115,7 @@ class Actionable(object):
         if not hasattr(self, '_actions'):
             self._actions = set([])
 
-        action = copy.deepcopy(action)
+        action = action.copy()
         self._actions.add(action)
         action.target = self
         action.start()
@@ -183,7 +191,7 @@ class IntervalAction(Action):
         return self._elapsed >= self.duration
 
 
-class SetAttributesAction(IntervalAction):
+class ChangeAttributesAction(IntervalAction):
     """Change one or more attributes of the target over a time interval."""
 
     def setup(self, attr, destval=1.0, duration=1.0, tween=ease_linear,
@@ -239,16 +247,19 @@ class SetAttributesAction(IntervalAction):
 
     def start(self):
         self.startval = []
-        self.interval = []
+        self.delta = []
 
         for i, attr in enumerate(self.attr):
             startval = getattr(self.target, attr, 0.)
+
+            if callable(self.destval[i]):
+                self.destval[i] = self.destval[i]()
 
             if self.relative:
                 self.destval[i] += startval
 
             self.startval.append(startval)
-            self.interval.append(self.destval[i] - startval)
+            self.delta.append(self.destval[i] - startval)
 
     def advance(self, t):
         for i, attr in enumerate(self.attr):
@@ -256,7 +267,7 @@ class SetAttributesAction(IntervalAction):
                 if self.done:
                     value = self.destval[i]
                 else:
-                    value = self.tween(t, self.startval[i], self.interval[i],
+                    value = self.tween(t, self.startval[i], self.delta[i],
                                        self.duration)
 
                 if self.clamp:
@@ -266,6 +277,40 @@ class SetAttributesAction(IntervalAction):
 
             if self.target is not None:
                 setattr(self.target, attr, value)
+
+
+class SetAttributesAction(Action):
+    """Set one or more attributes of the target to a given value immediately.
+    """
+    def setup(self, attr, destval=1., relative=False):
+        """Initialize the action parameters.
+
+        ``attr``, ``destval`` and ``relative`` have the same semantics as for
+        the ``ChangeAttributesAction``, except that each attribute is set to
+        it corresponding destination value immediately when the ``start``
+        method of the action is called.
+
+        """
+        self.relative = relative
+        self.attr = attr if isinstance(attr, (tuple, list)) else (attr,)
+
+        if isinstance(destval, (tuple, list)):
+            self.destval = list(destval)
+        else:
+            self.destval = [destval] * len(self.attr)
+
+    def start(self):
+        for i, attr in enumerate(self.attr):
+            if callable(self.destval[i]):
+                self.destval[i] = self.destval[i]()
+
+            if self.relative:
+                startval = getattr(self.target, attr, 0.)
+                self.destval[i] += startval
+
+            setattr(self.target, attr, self.destval[i])
+
+        self._done = True
 
 
 class SequenceAction(Action):
@@ -336,14 +381,49 @@ class ParallelAction(Action):
 
 
 class Delay(IntervalAction):
-    """Delays the action a certain amount of secondd."""
+    """Delays the action a certain amount of seconds."""
 
     def setup(self, delay):
         """Set delay to given amount in seconds (float or int)."""
         self.duration = delay
 
 
-class Fade(SetAttributesAction):
+class RepeatAction(Action):
+    """Repeat one action for n times or until stopped."""
+    def setup(self, action, times=None):
+        self.action = action
+        self.times = times
+
+    def start(self):
+        self.current = self.action.copy()
+        self.current.target = self.target
+        self.current.start()
+
+    def update(self, dt=0.):
+        self._elapsed += dt
+        self.current.update(dt)
+
+        if self.current.done:
+            self.current.stop()
+            if self.times is not None:
+                self.times -= 1
+
+            if self.times == 0:
+                self._done = True
+            else:
+                self.current = self.action.copy()
+                self.current.target = self.target
+                self.current.start()
+
+    def stop(self):
+        if not self._done:
+            self.current.stop()
+            self._done = True
+
+        super(RepeatAction, self).stop()
+
+
+class Fade(ChangeAttributesAction):
     """Fade the target in or out by modifying its opacity attribute."""
 
     def setup(self, value, *args, **kwargs):
@@ -392,7 +472,7 @@ class ToggleHidden(Action):
         self._done = True
 
 
-class MoveTo(SetAttributesAction):
+class MoveTo(ChangeAttributesAction):
     """Move the action target to a given position."""
 
     def setup(self, position=(0, 0), *args, **kwargs):
@@ -405,17 +485,17 @@ class MoveTo(SetAttributesAction):
         super(MoveTo, self).setup(('x', 'y'), position, *args, **kwargs)
 
 
-MoveToX = partial(SetAttributesAction, 'x')
-MoveToY = partial(SetAttributesAction, 'y')
+MoveToX = partial(ChangeAttributesAction, 'x')
+MoveToY = partial(ChangeAttributesAction, 'y')
 MoveBy = partial(MoveTo, relative=True)
-MoveByX = partial(SetAttributesAction, 'x', relative=True)
-MoveByY = partial(SetAttributesAction, 'y', relative=True)
+MoveByX = partial(ChangeAttributesAction, 'x', relative=True)
+MoveByY = partial(ChangeAttributesAction, 'y', relative=True)
 
 
 def _test(n=100.0):
     a = Actionable()
     a.value = 0
-    action = a.do(SetAttributeAction("value", n, 5.0, ease_in_expo))
+    action = a.do(ChangeAttributesAction("value", n, 5.0, ease_in_expo))
 
     try:
         dt = 0
