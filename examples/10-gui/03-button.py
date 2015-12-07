@@ -30,7 +30,7 @@ panel.pack()
 canvas.append(panel)
 
 def draw(canvas):
-    
+
     canvas.clear()
 
     if panel.show.value == True:
