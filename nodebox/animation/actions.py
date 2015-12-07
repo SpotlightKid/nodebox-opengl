@@ -490,6 +490,8 @@ MoveToY = partial(ChangeAttributesAction, 'y')
 MoveBy = partial(MoveTo, relative=True)
 MoveByX = partial(ChangeAttributesAction, 'x', relative=True)
 MoveByY = partial(ChangeAttributesAction, 'y', relative=True)
+RotateBy = partial(ChangeAttributesAction, 'rotation', relative=True)
+RotateTo = partial(ChangeAttributesAction, 'rotation')
 
 
 def _test(n=100.0):
