@@ -19,12 +19,10 @@ from pyglet.text.caret import Caret
 
 from nodebox.graphics.geometry import clamp, INFINITE
 from nodebox.graphics import (
-    Layer, Color, Image, image, crop,
-    Text, NORMAL, BOLD, DEFAULT_FONT, install_font,
-    translate, rotate, lighter,
-    line, STROKE_DASHED, STROKE_DOTTED,
-    DEFAULT, HAND, TEXT,
-    LEFT, RIGHT, UP, DOWN, TAB, ENTER, BACKSPACE, DELETE, CTRL, SHIFT, ALT)
+    BACKSPACE, CTRL, DEFAULT_FONT, DEFAULT, DELETE, DOWN, ENTER, HAND,
+    LEFT, NORMAL, RIGHT, STROKE_DOTTED, TAB, TEXT, UP,
+    Layer, Color, Image, Text,
+    crop, image, install_font, lighter, line, rotate, translate)
 
 TOP, BOTTOM, CENTER = "top", "bottom", "center"
 
@@ -63,7 +61,7 @@ class Theme(dict):
         """
         # Filename is assumed to be fontname.
         dict.__init__(self, ((basename(splitext(f)[0]), f)
-                  for f in glob(join(path, "*.png"))))
+                      for f in glob(join(path, "*.png"))))
         self["fonts"] = [basename(splitext(f)[0])
                          for f in glob(join(path, "*.ttf")) if install_font(f)]
         self["fontname"] = kwargs.get("fontname", self["fonts"][-1]
@@ -93,11 +91,17 @@ class Control(Layer):
     def __init__(self, x=0, y=0, id=None, color=(1, 1, 1, 1), **kwargs):
         Layer.__init__(self, x=x, y=y, **kwargs)
         self.id = id
-        self.src = {}        # Collection of source images.
-        self.color = color   # Color for source images.
-        self.enabled = True  # Enable event listener.
-        self.duration = 0    # Disable tweening.
-        self._controls = {}  # Lazy index of (id, control) children, see nested().
+        # Collection of source images.
+        self.src = {}
+        # Color for source images or drawing primitives.
+        self.color = Color(color)
+        # Enable event listener.
+        self.enabled = True
+        # Disable tweening.
+        self.duration = 0
+        # Lazy map of (id, control) children, see nested().
+        self._controls = {}
+        # Mouse press ongoing?
         self._press = None
 
     # Control width and height can't be modified after creation.
@@ -201,7 +205,8 @@ def nested(control, id):
 
     """
     # First check the Control._controls cache (=> 10x faster).
-    # Also check if the control's id changed after it was cached (however unlikely).
+    # Also check if the control's id changed after it was cached
+    # (however unlikely).
     # If so, the cached entry is no longer valid.
     if id in control._controls:
         ctrl = control._controls[id]
@@ -215,7 +220,8 @@ def nested(control, id):
     m = None
     for ctrl in control:
         if ctrl.__dict__.get("id") == id:
-            m = ctrl; break
+            m = ctrl
+            break
 
         if isinstance(ctrl, Layout):
             m = nested(ctrl, id)
@@ -261,7 +267,7 @@ class Label(Control):
         kwargs.setdefault("width", txt.metrics[0])
         kwargs.setdefault("height", txt.metrics[1])
         Control.__init__(self, x=x, y=y, id=id, **kwargs)
-        self.enabled = False # Pass on events to the layers underneath.
+        self.enabled = False  # Pass on events to the layers underneath.
         self._text = txt
         self._pack()
 
@@ -347,10 +353,9 @@ class Button(Control):
         # is pressed.
         self[0].x = 0.5 * (self.width - self[0].width)
         self[0].y = 0.5 * (self.height - self[0].height) - (
-                    self.offset if self.pressed else 0)
+            self.offset if self.pressed else 0)
 
     def draw(self):
-        #clr = [v * 0.75 for v in self.color] if self.pressed else self.color
         clr = lighter(self.color) if self.pressed else self.color
         im1, im2, im3 = self.src["cap1"], self.src["cap2"], self.src["face"]
         image(im1, 0, 0, height=self.height, color=clr)
@@ -363,6 +368,7 @@ class Button(Control):
         if self.contains(mouse.x, mouse.y, transformed=False):
             # Only fire event if mouse is actually released on the button.
             self.on_action()
+
 
 # -- ACTION -------------------------------------------------------------------
 
@@ -449,18 +455,18 @@ class Slider(Control):
 
         """
         Control.__init__(self, x=x, y=y, width=width, id=id, **kwargs)
-        self.min = min     # Slider minimum value.
-        self.max = max     # Slider maximum value.
-        self.default = default # Slider default value.
-        self.value = default # Slider current value.
-        self.steps = steps   # Number of steps from min to max.
+        self.min = min  # Slider minimum value.
+        self.max = max  # Slider maximum value.
+        self.default = default  # Slider default value.
+        self.value = default  # Slider current value.
+        self.steps = steps  # Number of steps from min to max.
         img, w = Image(theme["slider"]), 5
         self.src = {
-            "face1" : crop(img, w, 0, 1, img.height),
-            "face2" : crop(img, img.width-w, 0, 1, img.height),
-             "cap1" : crop(img, 0, 0, w, img.height),
-             "cap2" : crop(img, img.width-w, 0, w, img.height),
-           "handle" : Image(theme["slider-handle"])
+            "face1": crop(img, w, 0, 1, img.height),
+            "face2": crop(img, img.width-w, 0, 1, img.height),
+            "cap1": crop(img, 0, 0, w, img.height),
+            "cap2": crop(img, img.width-w, 0, w, img.height),
+            "handle": Image(theme["slider-handle"])
         }
         # The handle is a separate layer.
         self.append(Handle(self))
@@ -505,7 +511,7 @@ class Slider(Control):
         image(im4, x=t, y=0, width=self.width-t-im2.width+1, color=clr)
 
     def on_mouse_press(self, mouse):
-        x0, y0 = self.absolute_position() # Can be nested in other layers.
+        x0, y0 = self.absolute_position()  # Can be nested in other layers.
         step = 1.0 / max(self.steps, 1)
         # Calculate relative value from the slider handle position.
         # The inner width is a bit smaller to accomodate for the slider handle.
@@ -534,12 +540,12 @@ class Knob(Control):
 
         """
         Control.__init__(self, x=x, y=y, id=id, **kwargs)
-        self.default = default # Knob default angle.
-        self.value = default # Knob current angle.
-        self._limit = limit   # Constrain between 0-360 or scroll endlessly?
+        self.default = default  # Knob default angle.
+        self.value = default  # Knob current angle.
+        self._limit = limit  # Constrain between 0-360 or scroll endlessly?
         self.src = {
-            "face" : Image(theme["knob"]),
-          "socket" : Image(theme["knob-socket"]),
+            "face": Image(theme["knob"]),
+            "socket": Image(theme["knob-socket"]),
         }
         self._pack()
 
@@ -574,6 +580,7 @@ class Knob(Control):
     def on_mouse_drag(self, mouse):
         self.on_mouse_press(mouse)
 
+
 # =============================================================================
 
 # -- FLAG ---------------------------------------------------------------------
@@ -585,11 +592,11 @@ class Flag(Control):
             The checkbox value can be retrieved with Flag.value.
         """
         Control.__init__(self, x=x, y=y, id=id, **kwargs)
-        self.default = bool(default) # Flag default value.
-        self.value = bool(default) # Flag current value.
+        self.default = bool(default)  # Flag default value.
+        self.value = bool(default)  # Flag current value.
         self.src = {
-            "face" : Image(theme["flag"]),
-         "checked" : Image(theme["flag-checked"]),
+            "face": Image(theme["flag"]),
+            "checked": Image(theme["flag-checked"]),
         }
         self._pack()
 
@@ -601,8 +608,8 @@ class Flag(Control):
         self.value = self.default
 
     def draw(self):
-        clr = self.color
-        image(self.value and self.src["checked"] or self.src["face"], color=clr)
+        image(self.src["checked"] if self.value else self.src["face"],
+              color=self.color)
 
     def on_mouse_release(self, mouse):
         Control.on_mouse_release(self, mouse)
@@ -613,6 +620,7 @@ class Flag(Control):
 
 Checkbox = CheckBox = Flag
 
+
 # =============================================================================
 
 # -- Editable -----------------------------------------------------------------
@@ -620,14 +628,15 @@ Checkbox = CheckBox = Flag
 EDITING = None
 editing = lambda: EDITING
 
+
 class Editable(Control):
     """An editable text box.
 
     When clicked, it has the focus and can receive keyboard events.
 
     """
-    def __init__(self, value="", x=0, y=0, width=125, height=20, padding=(0,0),
-                 wrap=False, id=None, **kwargs):
+    def __init__(self, value="", x=0, y=0, width=125, height=20,
+                 padding=(0, 0), wrap=False, id=None, **kwargs):
         """Create an editable box.
 
         value is the initial text.
@@ -638,12 +647,12 @@ class Editable(Control):
 
         """
         txt = Text(value or " ", **{
-               "fill" : kwargs.pop("fill", Color(0,0.9)),
-               "font" : kwargs.pop("font", theme["fontname"]),
-           "fontsize" : kwargs.pop("fontsize", theme["fontsize"]),
-         "fontweight" : kwargs.pop("fontweight", theme["fontweight"]),
-         "lineheight" : kwargs.pop("lineheight", wrap and 1.25 or 1.0),
-              "align" : LEFT
+            "fill": kwargs.pop("fill", Color(0, 0.9)),
+            "font": kwargs.pop("font", theme["fontname"]),
+            "fontsize": kwargs.pop("fontsize", theme["fontsize"]),
+            "fontweight": kwargs.pop("fontweight", theme["fontweight"]),
+            "lineheight": kwargs.pop("lineheight", 1.25 if wrap else 1.0),
+            "align": LEFT
         })
         kwargs["width"] = width
         kwargs["height"] = height
@@ -659,13 +668,15 @@ class Editable(Control):
         self._editor.selection_color = txt._label.color
         self._editor.caret = Caret(self._editor)
         self._editor.caret.visible = False
-        self._editing = False # When True, cursor is blinking and text can be edited.
-        Editable._pack(self)  # On init, call Editable._pack(), not the derived Field._pack().
+        # When True, cursor is blinking and text can be edited.
+        self._editing = False
+        # On init, call Editable._pack(), not the derived Field._pack().
+        Editable._pack(self)
 
     def _pack(self):
         self._editor.x = self._padding[0]
         self._editor.y = self._padding[1]
-        self._editor.width = max(0, self.width  - self._padding[0] * 2)
+        self._editor.width = max(0, self.width - self._padding[0] * 2)
         self._editor.height = max(0, self.height - self._padding[1] * 2)
 
     @property
@@ -692,21 +703,24 @@ class Editable(Control):
         self._editing = b
         self._editor.caret.visible = b
 
-        if b is False and EDITING == self:
-            EDITING = None
-        if b is True:
+        if b:
             EDITING = self
             # Cursor is blinking and text can be edited.
             # Visit all layers on the canvas.
             # Remove the caret from all other Editable controls.
-            for layer in (self.root.canvas and self.root.canvas.layers or []):
-                layer.traverse(visit=lambda layer: \
-                    isinstance(layer, Editable) and layer != self and \
-                        setattr(layer, "editing", False))
+            def stop_editing(layer):
+                if isinstance(layer, Editable) and layer is not self:
+                    layer.editing = False
+
+            if self.root.canvas:
+                for layer in self.root.canvas.layers:
+                    layer.traverse(visit=stop_editing)
+        elif EDITING is self:
+            EDITING = None
 
     @property
     def selection(self):
-        # Yields a (start, stop)-tuple with the indices of the current selected text.
+        # Yields a (start, stop)-tuple with indices of current selected text.
         return (self._editor.selection_start, self._editor.selection_end)
 
     @property
@@ -722,11 +736,14 @@ class Editable(Control):
     def index(self, x, y):
         """Return the index of the character in the text at position x, y."""
         x0, y0 = self.absolute_position()
-        i = self._editor.get_position_from_point(x-x0, y-y0)
-        if self._editor.get_point_from_position(0)[0] > x-x0: # Pyglet bug?
+        i = self._editor.get_position_from_point(x - x0, y - y0)
+
+        if self._editor.get_point_from_position(0)[0] > x - x0:  # Pyglet bug?
             i = 0
+
         if self._empty:
             i = 0
+
         return i
 
     def on_mouse_enter(self, mouse):
@@ -745,6 +762,7 @@ class Editable(Control):
             self._editor.caret.visible = True
         elif not self.dragged:
             self._editor.caret.position = self.index(mouse.x, mouse.y)
+
         Control.on_mouse_release(self, mouse)
 
     def on_mouse_drag(self, mouse):
@@ -787,43 +805,49 @@ class Editable(Control):
                 y = keys.code == UP and -1 or +1
                 n = self._editor.get_line_count()
                 i = self._editor.get_position_on_line(
-                    min(max(self._editor.get_line_from_position(i)+y, 0), n-1),
-                            self._editor.get_point_from_position(i)[0])
+                    min(max(self._editor.get_line_from_position(i) + y, 0), n - 1),
+                    self._editor.get_point_from_position(i)[0])
                 self._editor.caret.position = i
             elif keys.code == TAB and TAB in self.reserved:
                 # The tab key navigates away from the control.
                 self._editor.caret.position = 0
                 self.editing = False
             elif keys.code == ENTER and ENTER in self.reserved:
-                # The enter key executes on_action() and navigates away from the control.
+                # Enter key executes on_action()
+                # and navigates away from the control.
                 self._editor.caret.position = 0
                 self.editing = False
                 self.on_action()
             elif keys.code in (BACKSPACE, DELETE) and self.selected:
                 # The backspace key removes the current text selection.
-                self.value = self.value[:self.selection[0]] + self.value[self.selection[1]:]
+                self._delete_selection()
                 self._editor.caret.position = max(self.selection[0], 0)
             elif keys.code == BACKSPACE and i > 0:
-                # The backspace key removes the character at the text cursor.
+                # Backspace key removes the character at the text cursor.
                 self.value = self.value[:i-1] + self.value[i:]
                 self._editor.caret.position = max(i-1, 0)
             elif keys.code == DELETE and i < len(self.value):
-                # The delete key removes the character to the right of text cursor.
-                self.value = self.value[:i] + self.value[i+1:]
+                # Delete key removes the character to the right of text cursor.
+                self._delete_selection()
+                self.value = self.value[:i] + self.value[i + 1:]
             elif keys.char:
                 if self.selected:
                     # Typing replaces any text currently selected.
-                    self.value = self.value[:self.selection[0]] + self.value[self.selection[1]:]
                     self._editor.caret.position = i = max(self.selection[0], 0)
+
                 ch = keys.char
                 ch = ch.replace("\r", "\n\r")
                 self.value = self.value[:i] + ch + self.value[i:]
-                self._editor.caret.position = min(i+1, len(self.value))
+                self._editor.caret.position = min(i + 1, len(self.value))
 
             self._editor.set_selection(0, 0)
 
     def draw(self):
         self._editor.draw()
+
+    def _delete_selection(self):
+        self.value = (self.value[:self.selection[0]] +
+                      self.value[self.selection[1]:])
 
 
 # --- Field -------------------------------------------------------------------
@@ -968,12 +992,13 @@ class Rulers(Control):
         p = self.parent or self.canvas
 
         if (p and (self._dirty or self.width != p.width or
-                self.height != p.height)):
+                   self.height != p.height)):
             self._dirty = False
             self._set_width(p.width)
             self._set_height(p.height)
 
-            for i in range(int(round(max(self.width, self.height) / self._step))):
+            nticks = int(round(max(self.width, self.height) / self._step))
+            for i in range(nticks):
                 if i % self._interval == 0:
                     self._markers.setdefault(i * self._step,
                         Text(str(int(round(i * self._step))),
@@ -1010,9 +1035,9 @@ class Rulers(Control):
         # Draw the crosshair.
         if self.crosshair:
             line(0, self.canvas.mouse.y, self.width, self.canvas.mouse.y,
-                 stroke=self.color, strokewidth=0.5, strokestyle=DOTTED)
+                 stroke=self.color, strokewidth=0.5, strokestyle=STROKE_DOTTED)
             line(self.canvas.mouse.x, 0, self.canvas.mouse.x, self.height,
-                 stroke=self.color, strokewidth=0.5, strokestyle=DOTTED)
+                 stroke=self.color, strokewidth=0.5, strokestyle=STROKE_DOTTED)
 
 
 # =============================================================================
@@ -1306,7 +1331,8 @@ class Labeled(Layout):
 
         """
         self.controls.insert(i, control)
-        self.captions.insert(i, Label(caption.upper(),
+        self.captions.insert(i,
+            Label(caption.upper(),
             fontsize=theme["fontsize"] * 0.8,
             fill=theme["text"].rgb + (theme["text"].a * 0.8,)))
         Layout.insert(self, i, self.controls[i])
